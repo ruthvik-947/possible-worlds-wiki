@@ -22,33 +22,40 @@ const allCategories = [...worldbuildingCategories.mental, ...worldbuildingCatego
 
 // Helper function to extract worldbuilding context from history
 function getWorldbuildingContext(history: any): string {
-  if (!history) return '';
+  const contextParts = [];
   
-  const contextParts: string[] = [];
-  
-  Object.entries(history).forEach(([group, categories]: [string, any]) => {
-    Object.entries(categories).forEach(([category, entries]: [string, any]) => {
-      if (entries && entries.length > 0) {
-        contextParts.push(`${category}: ${entries.slice(-2).join('; ')}`);
+  for (const [group, categories] of Object.entries(history)) {
+    for (const [category, entries] of Object.entries(categories as any)) {
+      if ((entries as string[]).length > 0) {
+        contextParts.push(`${category}: ${(entries as string[]).join(', ')}`);
       }
-    });
-  });
+    }
+  }
   
   return contextParts.join('. ');
+}
+
+function capitalizeTitle(title: string): string {
+  return title
+    .split(' ')
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(' ');
 }
 
 app.post('/api/generate', async (req: any, res: any) => {
   const { input, type, context, worldbuildingHistory } = req.body;
 
-  const title = type === 'seed' ?
-    input.split(' ').slice(0, 5).join(' ').replace(/[.,!?]$/, '') :
-    input;
+  const title = capitalizeTitle(
+    type === 'seed' ?
+      input.split(' ').slice(0, 5).join(' ').replace(/[.,!?]$/, '') :
+      input
+  );
 
   try {
     const result = await generateObject({
       model: openai('gpt-4o'),
       schema: z.object({
-        content: z.string().describe("The main wiki content for the page, written in a descriptive and encyclopedic style. Should be 3-4 paragraphs long. Ensure that the content doesn't track real world entities or concepts much."),
+        content: z.string().describe("The main wiki content for the page, written in a descriptive and encyclopedic style. Should be 3-4 paragraphs long. Ensure that the content only mildly tracks real world entities or concepts."),
         categories: z.array(z.string()).describe("A list of 2-4 relevant categories for this topic from the provided list."),
         clickableTerms: z.array(z.string()).describe("A list of 5-8 interesting terms or proper nouns from the generated content that could be clicked to generate a new wiki page. These should be exact matches to words in the content."),
         relatedConcepts: z.array(z.object({
@@ -60,7 +67,7 @@ app.post('/api/generate', async (req: any, res: any) => {
           value: z.string(),
         })).describe("A list of 3-4 basic facts about the topic in the format 'fact name: text'. Examples: 'Year: 31457AD', 'Location: Eastern Mars', 'Population: 2.3 million'. These should be single sentences and relevant to the topic.")
       }),
-      prompt: `You are a creative worldbuilding assistant. You are profoundly knowledgeable about mythologies from around the world (not only Western ones), and have a Borgesian imagination. Generate a wiki page for a fictional possible universe.
+      prompt: `You are a worldbuilding agent. You are profoundly knowledgeable about history, mythology, cosmology, philosophy, and anthropology from around the world (not only Western ones), and have a Borgesian imagination. Generate a wiki page for a topic within a fictional possible universe.
       
       The user has provided the following input: "${input}"
       This is a ${type === 'seed' ? 'seed sentence to start the wiki' : `term to expand upon`}.
@@ -94,6 +101,8 @@ app.post('/api/generate', async (req: any, res: any) => {
 app.post('/api/generate-section', async (req: any, res: any) => {
   const { sectionTitle, pageTitle, pageContent, worldbuildingHistory } = req.body;
 
+  const capitalizedSectionTitle = capitalizeTitle(sectionTitle);
+
   try {
     const result = await generateObject({
       model: openai('gpt-4o'),
@@ -104,10 +113,10 @@ app.post('/api/generate-section', async (req: any, res: any) => {
       
       The main page is titled: "${pageTitle}"
       The main page content is: "${pageContent}"
-      The new section title is: "${sectionTitle}"
+      The new section title is: "${capitalizedSectionTitle}"
       ${worldbuildingHistory ? `Existing worldbuilding context: "${getWorldbuildingContext(worldbuildingHistory)}"` : ''}
 
-      Generate a single paragraph of content for the section "${sectionTitle}". The content should:
+      Generate a single paragraph of content for the section "${capitalizedSectionTitle}". The content should:
       - Be written in an encyclopedic tone that matches the main page
       - Be 2-3 sentences long
       - Be relevant to the section title
@@ -118,7 +127,7 @@ app.post('/api/generate-section', async (req: any, res: any) => {
     });
 
     res.json({
-      title: sectionTitle,
+      title: capitalizedSectionTitle,
       content: result.object.content,
     });
 

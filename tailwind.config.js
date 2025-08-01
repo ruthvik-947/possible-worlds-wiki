@@ -14,11 +14,20 @@ module.exports = {
       center: true,
       padding: "2rem",
       screens: {
-        "2xl": "1400px",
+        "2xl": "1280px",
       },
     },
     extend: {
       colors: {
+        // Glass Minimalism Color Palette
+        'glass-bg': '#FAF8F5',
+        'glass-text': '#1E3A3F',
+        'glass-accent': '#5FAFDA',
+        'glass-sidebar': '#6B7C76',
+        'glass-highlight': '#D59F55',
+        'glass-divider': '#E4E0DA',
+        
+        // Keep existing theme compatibility
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
         ring: "hsl(var(--ring))",
@@ -53,6 +62,24 @@ module.exports = {
           foreground: "hsl(var(--card-foreground))",
         },
       },
+      fontFamily: {
+        'serif': ['Cormorant Garamond', 'Tiempos', 'serif'],
+        'sans': ['Inter', 'Atkinson Hyperlegible', 'sans-serif'],
+        'mono': ['IBM Plex Mono', 'monospace'],
+      },
+      fontSize: {
+        'h1': '2.5rem',
+        'h2': '1.75rem',
+        'body': '1.125rem',
+      },
+      spacing: {
+        '280': '280px',
+        '720': '720px',
+      },
+      backdropFilter: {
+        'none': 'none',
+        'blur': 'blur(20px)',
+      },
       borderRadius: {
         lg: "var(--radius)",
         md: "calc(var(--radius) - 2px)",
@@ -67,10 +94,15 @@ module.exports = {
           from: { height: "var(--radix-accordion-content-height)" },
           to: { height: "0" },
         },
+        "fade-in": {
+          from: { opacity: "0" },
+          to: { opacity: "1" },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
+        "fade-in": "fade-in 0.3s ease-out",
       },
     },
   },

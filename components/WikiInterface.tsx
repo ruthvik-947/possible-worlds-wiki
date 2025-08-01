@@ -3,7 +3,7 @@ import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
-import { ArrowLeft, Home, Search, Loader, Download, Upload } from 'lucide-react';
+import { ArrowLeft, Home, Search, Loader, Download, Upload, Menu, Sun } from 'lucide-react';
 import { WikiPage } from './WikiPage';
 import { generateWikiPage, WikiPageData } from './WikiGenerator';
 import { 
@@ -154,48 +154,94 @@ export function WikiInterface() {
   const currentPage = currentPageId ? pages.get(currentPageId) : null;
 
   return (
-    <div className="min-h-screen flex flex-col bg-background">
-      {/* Top navigation */}
-      <header className="bg-card border-b border-border px-6 py-4">
-        <h1 className="text-2xl font-semibold">PossibleWorldWikis</h1>
-      </header>
+    <div className="min-h-screen bg-glass-bg">
+      {/* Fixed Top Navigation - Glass Minimalism Style */}
+      <nav className="fixed top-0 left-0 right-0 bg-glass-text z-50 h-16">
+        <div className="max-w-screen-2xl mx-auto px-6 h-full flex items-center justify-between">
+          {/* Logo */}
+          <div className="flex items-center">
+            <h1 className="text-2xl font-serif font-medium text-glass-bg tracking-wide">
+              PWW
+            </h1>
+          </div>
 
-      <main className="flex-1 flex overflow-hidden">
+          {/* Center Search Bar */}
+          {/* <div className="flex-1 max-w-md mx-8">
+            <div className="relative">
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-glass-sidebar" />
+              <Input
+                placeholder="Search the wiki..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-12 bg-glass-bg/10 border-glass-divider/30 text-glass-bg placeholder:text-glass-sidebar/70 rounded-full backdrop-blur-sm focus:bg-glass-bg/20 transition-colors"
+              />
+            </div>
+          </div> */}
+
+          {/* Right Menu */}
+          <div className="flex items-center space-x-4">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-glass-bg hover:bg-glass-bg/10 h-8 w-8 p-0"
+            >
+              <Sun className="h-4 w-4" />
+            </Button>
+            {/* <Button
+              variant="ghost"
+              size="sm"
+              className="text-glass-bg hover:bg-glass-bg/10 h-8 w-8 p-0"
+            >
+              <Menu className="h-4 w-4" />
+            </Button> */}
+          </div>
+        </div>
+      </nav>
+
+      <div className="pt-16 max-w-screen-2xl mx-auto flex min-h-screen">
         {!currentPage ? (
-          <div className="max-w-4xl mx-auto p-6 overflow-auto">
-            <div className="text-center py-12">
-              {/* <h2 className="text-3xl mb-4">Possible World Wikis</h2> */}
-              {/* <p className="text-muted-foreground mb-8 max-w-2xl mx-auto">
-                Enter a sentence about your fictional world to begin. 
-              </p> */}
+          /* Welcome Screen */
+          <div className="flex-1 flex items-center justify-center p-8">
+            <div className="w-full max-w-2xl animate-fade-in">
+              <div className="text-center mb-12">
+                <h1 className="font-serif text-6xl font-medium text-glass-text mb-6 tracking-wide">
+                  PossibleWorldWiki
+                </h1>
+                {/* <div className="w-24 h-px bg-glass-divider mx-auto mb-6"></div> */}
+                {/* <p className="text-glass-sidebar text-lg leading-relaxed">
+                  Enter a sentence about your fictional world to begin exploring the infinite possibilities of your imagination.
+                </p> */}
+              </div>
 
-              <Card className="max-w-2xl mx-auto">
-                <CardHeader>
-                  <CardTitle>Seed Your World</CardTitle>
+              <Card className="glass-panel">
+                <CardHeader className="text-center">
+                  <CardTitle className="font-sans text-l text-glass-text">
+                    Seed a world with the title of its first wiki page.
+                  </CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-4">
+                <CardContent className="space-y-6 flex flex-col items-center">
                   <Input
-                    placeholder=""
+                    // placeholder="In the realm of Aethros, floating cities drift through crystal clouds..."
                     value={seedSentence}
                     onChange={(e) => setSeedSentence(e.target.value)}
-                    className="text-base"
+                    className="text-body border-glass-divider focus:border-glass-accent bg-glass-bg/50"
                   />
                   <Button
                     onClick={handleGenerateFirstPage}
                     disabled={!seedSentence.trim() || isLoading}
-                    className="w-full"
+                    className="w-1/2 bg-glass-text hover:bg-glass-text/90 text-glass-bg font-medium py-3"
                   >
                     {isLoading ? (
                       <>
                         <Loader className="mr-2 h-4 w-4 animate-spin" />
-                        Generating...
+                        Building...
                       </>
                     ) : (
-                      'Generate Wiki'
+                      'Generate'
                     )}
                   </Button>
                   
-                  <div className="pt-4 border-t">
+                  <div className="pt-6 border-t border-glass-divider">
                     <input
                       type="file"
                       accept=".json"
@@ -208,7 +254,7 @@ export function WikiInterface() {
                       <Button
                         variant="ghost"
                         size="sm"
-                        className="w-full text-xs text-muted-foreground hover:text-foreground"
+                        className="w-full text-sm text-glass-sidebar hover:text-glass-text hover:bg-glass-divider/30"
                         disabled={isLoading}
                         asChild
                       >
@@ -221,60 +267,64 @@ export function WikiInterface() {
                   </div>
                 </CardContent>
               </Card>
-
             </div>
           </div>
         ) : (
           <>
-            {/* Sidebar */}
-            <div className="w-64 bg-card border-r border-border flex flex-col overflow-auto">
-              <div className="p-4 border-b border-border">
-                <div className="flex items-center gap-2 mb-4">
+            {/* Left Sidebar - 280px fixed width */}
+            <aside className="w-280 bg-glass-bg border-r border-glass-divider flex flex-col">
+              <div className="p-6 border-b border-glass-divider">
+                <div className="flex items-center gap-2 mb-6">
                   <Button
                     variant="ghost"
                     size="sm"
                     onClick={handleBack}
                     disabled={pageHistory.length === 0}
+                    className="h-8 w-8 p-0 text-glass-sidebar hover:text-glass-text hover:bg-glass-divider/30"
                   >
-                    <ArrowLeft className="size-4" />
+                    <ArrowLeft className="h-4 w-4" />
                   </Button>
                   <Button
                     variant="ghost"
                     size="sm"
                     onClick={handleHome}
                     disabled={pageHistory.length === 0}
+                    className="h-8 w-8 p-0 text-glass-sidebar hover:text-glass-text hover:bg-glass-divider/30"
                   >
-                    <Home className="size-4" />
+                    <Home className="h-4 w-4" />
                   </Button>
-
                 </div>
 
                 <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-glass-sidebar" />
                   <Input
                     placeholder="Search pages..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-10"
+                    className="pl-10 border-glass-divider focus:border-glass-accent bg-glass-bg"
                   />
                 </div>
               </div>
 
-              <div className="flex-1 p-4">
-                <h3 className="text-sm font-medium mb-3">Contents</h3>
+              <div className="flex-1 p-6 overflow-auto">
+                <h3 className="font-serif text-lg font-medium text-glass-text mb-4">Contents</h3>
                 <div className="space-y-2">
                   {(searchQuery ? filteredPages : Array.from(pages.values())).map(page => (
                     <Button
                       key={page.id}
-                      variant={currentPageId === page.id ? "secondary" : "ghost"}
-                      className="w-full justify-start text-left h-auto p-3"
+                      variant="ghost"
+                      className={`w-full justify-start text-left h-auto p-4 rounded-lg transition-all duration-200 ${
+                        currentPageId === page.id 
+                          ? "bg-glass-accent/10 text-glass-accent border border-glass-accent/20" 
+                          : "text-glass-sidebar hover:text-glass-text hover:bg-glass-divider/30"
+                      }`}
                       onClick={() => navigateToPage(page.id)}
                     >
-                      <div>
-                        <div className="font-medium text-sm truncate">
+                      <div className="w-full min-w-0">
+                        <div className="font-medium text-sm mb-1 line-clamp-1 truncate">
                           {page.title}
                         </div>
-                        <div className="text-xs text-muted-foreground mt-1 line-clamp-2">
+                        <div className="text-xs opacity-70 line-clamp-2">
                           {page.content.substring(0, 80)}...
                         </div>
                       </div>
@@ -282,13 +332,53 @@ export function WikiInterface() {
                   ))}
                 </div>
               </div>
-            </div>
 
-            {/* Main content */}
-            <div className="flex-1 overflow-auto relative">
+              {/* Bottom export/import section */}
+              <div className="p-6 border-t border-glass-divider">
+                <div className="space-y-3">
+                  <Button
+                    onClick={handleExportWorldbuilding}
+                    variant="ghost"
+                    size="sm"
+                    className="w-full text-glass-sidebar hover:text-glass-text hover:bg-glass-divider/30"
+                  >
+                    <Download className="mr-2 h-4 w-4" />
+                    Export World
+                  </Button>
+                  <input
+                    type="file"
+                    accept=".json"
+                    onChange={handleImportWorldbuilding}
+                    className="hidden"
+                    id="import-sidebar"
+                    disabled={isLoading}
+                  />
+                  <label htmlFor="import-sidebar">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="w-full text-glass-sidebar hover:text-glass-text hover:bg-glass-divider/30"
+                      disabled={isLoading}
+                      asChild
+                    >
+                      <span>
+                        <Upload className="mr-2 h-4 w-4" />
+                        Import World
+                      </span>
+                    </Button>
+                  </label>
+                </div>
+              </div>
+            </aside>
+
+            {/* Main Content Area */}
+            <div className="flex-1 relative">
               {isLoading && (
-                <div className="absolute inset-0 bg-background/80 flex items-center justify-center z-10">
-                  <Loader className="h-8 w-8 animate-spin text-primary" />
+                <div className="absolute inset-0 glass-panel flex items-center justify-center z-10">
+                  <div className="text-center">
+                    <Loader className="h-8 w-8 animate-spin text-glass-accent mx-auto mb-4" />
+                    <p className="text-glass-sidebar">Generating content...</p>
+                  </div>
                 </div>
               )}
               <WikiPage
@@ -307,7 +397,7 @@ export function WikiInterface() {
             </div>
           </>
         )}
-      </main>
+      </div>
     </div>
   );
 }
