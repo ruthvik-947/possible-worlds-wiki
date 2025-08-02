@@ -15,7 +15,8 @@ export async function generateWikiPage(
   input: string, 
   type: 'seed' | 'term', 
   context?: string,
-  worldbuildingHistory?: WorldbuildingRecord
+  worldbuildingHistory?: WorldbuildingRecord,
+  sessionId?: string
 ): Promise<WikiPageData> {
   try {
     const response = await fetch('http://localhost:3001/api/generate', {
@@ -27,7 +28,8 @@ export async function generateWikiPage(
         input, 
         type, 
         context,
-        worldbuildingHistory 
+        worldbuildingHistory,
+        sessionId
       }),
     });
 
@@ -48,7 +50,8 @@ export async function generateSectionContent(
   sectionTitle: string,
   pageTitle: string,
   pageContent: string,
-  worldbuildingHistory?: WorldbuildingRecord
+  worldbuildingHistory?: WorldbuildingRecord,
+  sessionId?: string
 ): Promise<{ title: string; content: string }> {
   try {
     const response = await fetch('http://localhost:3001/api/generate-section', {
@@ -60,7 +63,8 @@ export async function generateSectionContent(
         sectionTitle,
         pageTitle,
         pageContent,
-        worldbuildingHistory 
+        worldbuildingHistory,
+        sessionId
       }),
     });
 

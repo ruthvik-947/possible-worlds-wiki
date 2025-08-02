@@ -6,6 +6,19 @@ const { openai } = require('@ai-sdk/openai');
 const { z } = require('zod');
 require('dotenv/config');
 
+// Store API keys temporarily in memory (will be cleared on server restart)
+const activeApiKeys = new Map();
+
+// Clean up old API keys every hour
+setInterval(() => {
+  const now = Date.now();
+  for (const [sessionId, data] of activeApiKeys.entries()) {
+    if (now - data.timestamp > 24 * 60 * 60 * 1000) { // 24 hours
+      activeApiKeys.delete(sessionId);
+    }
+  }
+}, 60 * 60 * 1000); // Check every hour
+
 const app = express();
 const port = process.env.PORT || 3001;
 
@@ -42,8 +55,34 @@ function capitalizeTitle(title: string): string {
     .join(' ');
 }
 
+// Check if user API keys are enabled
+app.get('/api/config', (req: any, res: any) => {
+  res.json({
+    enableUserApiKeys: process.env.ENABLE_USER_API_KEYS === 'true'
+  });
+});
+
+// API key storage endpoint (no validation for now)
+app.post('/api/store-key', async (req: any, res: any) => {
+  const { apiKey } = req.body;
+
+  if (!apiKey || !apiKey.startsWith('sk-')) {
+    return res.status(400).json({ error: 'Invalid API key format' });
+  }
+
+  // Store the API key with a session ID
+  const sessionId = Math.random().toString(36).substr(2, 9);
+  activeApiKeys.set(sessionId, { apiKey, timestamp: Date.now() });
+
+  res.json({ 
+    success: true, 
+    sessionId,
+    message: 'API key stored' 
+  });
+});
+
 app.post('/api/generate', async (req: any, res: any) => {
-  const { input, type, context, worldbuildingHistory } = req.body;
+  const { input, type, context, worldbuildingHistory, sessionId } = req.body;
 
   const title = capitalizeTitle(
     type === 'seed' ?
@@ -51,9 +90,25 @@ app.post('/api/generate', async (req: any, res: any) => {
       input
   );
 
+  // Use API key from session if user API keys are enabled, otherwise use environment variable
+  const enableUserApiKeys = process.env.ENABLE_USER_API_KEYS === 'true';
+  const sessionData = (enableUserApiKeys && sessionId) ? activeApiKeys.get(sessionId) : null;
+  const apiKey = sessionData ? sessionData.apiKey : process.env.OPENAI_API_KEY;
+  
+  if (!apiKey) {
+    const errorMessage = enableUserApiKeys 
+      ? 'No valid API key provided. Please set your API key first.'
+      : 'No API key configured. Please set OPENAI_API_KEY in your environment variables.';
+    return res.status(401).json({ error: errorMessage });
+  }
+
   try {
+    const model = openai('gpt-4o', {
+      apiKey: apiKey
+    });
+    
     const result = await generateObject({
-      model: openai('gpt-4o'),
+      model: model,
       schema: z.object({
         content: z.string().describe("The main wiki content for the page, written in a descriptive and encyclopedic style. Should be 3-4 paragraphs long. Ensure that the content only mildly tracks real world entities or concepts."),
         categories: z.array(z.string()).describe("A list of 2-4 relevant categories for this topic from the provided list."),
@@ -99,13 +154,29 @@ app.post('/api/generate', async (req: any, res: any) => {
 });
 
 app.post('/api/generate-section', async (req: any, res: any) => {
-  const { sectionTitle, pageTitle, pageContent, worldbuildingHistory } = req.body;
+  const { sectionTitle, pageTitle, pageContent, worldbuildingHistory, sessionId } = req.body;
 
   const capitalizedSectionTitle = capitalizeTitle(sectionTitle);
 
+  // Use API key from session if user API keys are enabled, otherwise use environment variable
+  const enableUserApiKeys = process.env.ENABLE_USER_API_KEYS === 'true';
+  const sessionData = (enableUserApiKeys && sessionId) ? activeApiKeys.get(sessionId) : null;
+  const apiKey = sessionData ? sessionData.apiKey : process.env.OPENAI_API_KEY;
+  
+  if (!apiKey) {
+    const errorMessage = enableUserApiKeys 
+      ? 'No valid API key provided. Please set your API key first.'
+      : 'No API key configured. Please set OPENAI_API_KEY in your environment variables.';
+    return res.status(401).json({ error: errorMessage });
+  }
+
   try {
+    const model = openai('gpt-4o', {
+      apiKey: apiKey
+    });
+    
     const result = await generateObject({
-      model: openai('gpt-4o'),
+      model: model,
       schema: z.object({
         content: z.string().describe("A single paragraph of content for the section, written in an encyclopedic style that matches the tone of the main page content. Should be 2-3 sentences long and relevant to the section title.")
       }),

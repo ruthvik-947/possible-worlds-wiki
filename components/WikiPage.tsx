@@ -11,9 +11,11 @@ interface WikiPageProps {
   onTermClick: (term: string, context: string) => void;
   worldbuildingHistory?: WorldbuildingRecord;
   onWorldbuildingImport?: (record: WorldbuildingRecord) => void;
+  sessionId?: string;
+  enableUserApiKeys?: boolean;
 }
 
-export function WikiPage({ page, onTermClick, worldbuildingHistory, onWorldbuildingImport }: WikiPageProps) {
+export function WikiPage({ page, onTermClick, worldbuildingHistory, onWorldbuildingImport, sessionId, enableUserApiKeys = false }: WikiPageProps) {
   const [sections, setSections] = useState<{ title: string; content: string }[]>(page.sections || []);
   const [isAddingSection, setIsAddingSection] = useState(false);
   const [newSectionTitle, setNewSectionTitle] = useState('');
@@ -92,7 +94,7 @@ export function WikiPage({ page, onTermClick, worldbuildingHistory, onWorldbuild
           <button
             key={index}
             onClick={() => onTermClick(part, content)}
-            className="text-glass-accent hover:text-glass-accent/80 underline underline-offset-2 cursor-pointer bg-transparent border-none p-0 font-inherit transition-colors"
+            className="text-glass-accent hover:text-glass-accent/80 underline underline-offset-2 cursor-pointer bg-transparent border-none p-0 font-sans text-base leading-relaxed transition-colors"
           >
             {part}
           </button>
@@ -104,13 +106,19 @@ export function WikiPage({ page, onTermClick, worldbuildingHistory, onWorldbuild
 
   const handleAddSection = async () => {
     if (!newSectionTitle.trim()) return;
+    if (enableUserApiKeys && !sessionId) {
+      alert('Please set your API key first before generating content.');
+      return;
+    }
 
     setIsGenerating(true);
     try {
       const newSection = await generateSectionContent(
         newSectionTitle,
         page.title,
-        page.content
+        page.content,
+        worldbuildingHistory,
+        enableUserApiKeys ? sessionId : undefined
       );
       
       setSections(prev => [...prev, newSection]);

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
@@ -6,6 +6,7 @@ import { Badge } from './ui/badge';
 import { ArrowLeft, Home, Search, Loader, Download, Upload, Menu, Sun } from 'lucide-react';
 import { WikiPage } from './WikiPage';
 import { generateWikiPage, WikiPageData } from './WikiGenerator';
+import { ApiKeyDialog } from './ApiKeyDialog';
 import { 
   WorldbuildingRecord, 
   createEmptyWorldbuildingRecord, 
@@ -23,6 +24,22 @@ export function WikiInterface() {
   const [isLoading, setIsLoading] = useState(false);
   const [worldbuildingHistory, setWorldbuildingHistory] = useState<WorldbuildingRecord>(createEmptyWorldbuildingRecord());
   const [importError, setImportError] = useState<string | null>(null);
+  const [apiKey, setApiKey] = useState<string>('');
+  const [sessionId, setSessionId] = useState<string>('');
+  const [enableUserApiKeys, setEnableUserApiKeys] = useState<boolean>(false);
+
+  // Check configuration on mount
+  useEffect(() => {
+    fetch('http://localhost:3001/api/config')
+      .then(res => res.json())
+      .then(config => setEnableUserApiKeys(config.enableUserApiKeys))
+      .catch(err => console.error('Failed to fetch config:', err));
+  }, []);
+
+  const handleApiKeySet = (key: string, newSessionId: string) => {
+    setApiKey(key);
+    setSessionId(newSessionId);
+  };
 
   const handleExportWorldbuilding = () => {
     const totalEntries = Object.values(worldbuildingHistory).reduce((total, group) => 
@@ -64,11 +81,16 @@ export function WikiInterface() {
       });
   };
 
+
   const handleGenerateFirstPage = async () => {
     if (!seedSentence.trim()) return;
+    if (enableUserApiKeys && !sessionId) {
+      alert('Please set your API key first before generating content.');
+      return;
+    }
     setIsLoading(true);
     try {
-      const firstPage = await generateWikiPage(seedSentence, 'seed', undefined, worldbuildingHistory);
+      const firstPage = await generateWikiPage(seedSentence, 'seed', undefined, worldbuildingHistory, enableUserApiKeys ? sessionId : undefined);
       
       // Update worldbuilding history with the new page
       const updatedHistory = updateWorldbuildingHistory(
@@ -90,6 +112,11 @@ export function WikiInterface() {
   };
 
   const handleTermClick = async (term: string, context: string) => {
+    if (enableUserApiKeys && !sessionId) {
+      alert('Please set your API key first before generating content.');
+      return;
+    }
+
     // Check if page already exists
     const existingPageId = Array.from(pages.keys()).find(id => 
       pages.get(id)?.title.toLowerCase() === term.toLowerCase()
@@ -103,7 +130,7 @@ export function WikiInterface() {
     // Generate new page
     setIsLoading(true);
     try {
-      const newPage = await generateWikiPage(term, 'term', context, worldbuildingHistory);
+      const newPage = await generateWikiPage(term, 'term', context, worldbuildingHistory, enableUserApiKeys ? sessionId : undefined);
       
       // Update worldbuilding history with the new page
       const updatedHistory = updateWorldbuildingHistory(
@@ -226,20 +253,29 @@ export function WikiInterface() {
                     onChange={(e) => setSeedSentence(e.target.value)}
                     className="text-body border-glass-divider focus:border-glass-accent bg-glass-bg/50"
                   />
-                  <Button
-                    onClick={handleGenerateFirstPage}
-                    disabled={!seedSentence.trim() || isLoading}
-                    className="w-1/2 bg-glass-text hover:bg-glass-text/90 text-glass-bg font-medium py-3"
-                  >
-                    {isLoading ? (
-                      <>
-                        <Loader className="mr-2 h-4 w-4 animate-spin" />
-                        Building...
-                      </>
-                    ) : (
-                      'Generate'
+                  <div className="flex gap-3 w-full">
+                    {enableUserApiKeys && (
+                      <ApiKeyDialog
+                        onApiKeySet={handleApiKeySet}
+                        isApiKeyValid={!!sessionId}
+                        isLoading={isLoading}
+                      />
                     )}
-                  </Button>
+                    <Button
+                      onClick={handleGenerateFirstPage}
+                      disabled={!seedSentence.trim() || isLoading || (enableUserApiKeys && !sessionId)}
+                      className={`${enableUserApiKeys ? 'flex-1' : 'w-full'} bg-glass-text hover:bg-glass-text/90 text-glass-bg font-medium py-3`}
+                    >
+                      {isLoading ? (
+                        <>
+                          <Loader className="mr-2 h-4 w-4 animate-spin" />
+                          Building...
+                        </>
+                      ) : (
+                        'Generate'
+                      )}
+                    </Button>
+                  </div>
                   
                   <div className="pt-6 border-t border-glass-divider">
                     <input
@@ -385,6 +421,8 @@ export function WikiInterface() {
                 page={currentPage}
                 onTermClick={handleTermClick}
                 worldbuildingHistory={worldbuildingHistory}
+                sessionId={enableUserApiKeys ? sessionId : undefined}
+                enableUserApiKeys={enableUserApiKeys}
                 onWorldbuildingImport={(importedRecord) => {
                   setWorldbuildingHistory(importedRecord);
                   setPages(new Map()); // Clear existing pages
