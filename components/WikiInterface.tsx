@@ -14,6 +14,7 @@ import {
   exportWorldbuildingRecord,
   importWorldbuildingRecord
 } from './WorldbuildingHistory';
+import { config } from '../lib/config';
 
 export function WikiInterface() {
   const [pages, setPages] = useState<Map<string, WikiPageData>>(new Map());
@@ -31,9 +32,9 @@ export function WikiInterface() {
 
   // Check configuration on mount
   useEffect(() => {
-    fetch('http://localhost:3001/api/config')
+    fetch(config.endpoints.config)
       .then(res => res.json())
-      .then(config => setEnableUserApiKeys(config.enableUserApiKeys))
+      .then(configData => setEnableUserApiKeys(configData.enableUserApiKeys))
       .catch(err => console.error('Failed to fetch config:', err));
   }, []);
 

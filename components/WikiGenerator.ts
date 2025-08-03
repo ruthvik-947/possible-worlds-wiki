@@ -1,4 +1,5 @@
 import { WorldbuildingRecord } from './WorldbuildingHistory';
+import { config } from '../lib/config';
 
 export interface WikiPageData {
   id: string;
@@ -19,7 +20,7 @@ export async function generateWikiPage(
   sessionId?: string
 ): Promise<WikiPageData> {
   try {
-    const response = await fetch('http://localhost:3001/api/generate', {
+    const response = await fetch(config.endpoints.generate, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -54,7 +55,7 @@ export async function generateSectionContent(
   sessionId?: string
 ): Promise<{ title: string; content: string }> {
   try {
-    const response = await fetch('http://localhost:3001/api/generate-section', {
+    const response = await fetch(config.endpoints.generateSection, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
