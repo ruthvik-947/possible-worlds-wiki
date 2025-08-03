@@ -2,7 +2,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { generateObject } from 'ai';
 import { openai } from '@ai-sdk/openai';
 import { z } from 'zod';
-import { activeApiKeys, getWorldbuildingContext, capitalizeTitle } from './utils/shared.js';
+import { activeApiKeys, getWorldbuildingContext, capitalizeTitle } from './utils/shared';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
