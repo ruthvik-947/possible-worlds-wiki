@@ -1,5 +1,5 @@
 // Store API keys temporarily in memory (will be cleared on server restart)
-export const activeApiKeys = new Map<string, { apiKey: string; timestamp: number }>();
+const activeApiKeys = new Map<string, { apiKey: string; timestamp: number }>();
 
 // Clean up old API keys every hour
 setInterval(() => {
@@ -11,16 +11,16 @@ setInterval(() => {
   }
 }, 60 * 60 * 1000); // Check every hour
 
-export const worldbuildingCategories = {
+const worldbuildingCategories = {
   mental: ['Culture', 'Identity', 'Beliefs', 'Ideologies', 'Language', 'Networks', 'Behavior', 'Memes'],
   material: ['Physics', 'Chemistry', 'Biology', 'Landscapes & Terrains', 'Climate'],
   social: ['Social Structure', 'Politics', 'Work', 'Technology', 'Architecture', 'Ethics', 'Transportation', 'Zoology']
 };
 
-export const allCategories = [...worldbuildingCategories.mental, ...worldbuildingCategories.material, ...worldbuildingCategories.social];
+const allCategories = [...worldbuildingCategories.mental, ...worldbuildingCategories.material, ...worldbuildingCategories.social];
 
 // Helper function to extract worldbuilding context from history
-export function getWorldbuildingContext(history: any): string {
+function getWorldbuildingContext(history: any): string {
   const contextParts = [];
   
   for (const [group, categories] of Object.entries(history)) {
@@ -34,9 +34,17 @@ export function getWorldbuildingContext(history: any): string {
   return contextParts.join('. ');
 }
 
-export function capitalizeTitle(title: string): string {
+function capitalizeTitle(title: string): string {
   return title
     .split(' ')
     .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
     .join(' ');
 }
+
+module.exports = {
+  activeApiKeys,
+  worldbuildingCategories,
+  allCategories,
+  getWorldbuildingContext,
+  capitalizeTitle
+};
