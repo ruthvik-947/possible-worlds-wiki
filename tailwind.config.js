@@ -19,13 +19,13 @@ module.exports = {
     },
     extend: {
       colors: {
-        // Glass Minimalism Color Palette
-        'glass-bg': '#FAF8F5',
-        'glass-text': '#1E3A3F',
-        'glass-accent': '#5FAFDA',
-        'glass-sidebar': '#6B7C76',
-        'glass-highlight': '#D59F55',
-        'glass-divider': '#E4E0DA',
+        // Glass Minimalism Color Palette using CSS variables
+        'glass-bg': 'var(--glass-bg)',
+        'glass-text': 'var(--glass-text)',
+        'glass-accent': 'var(--glass-accent)',
+        'glass-sidebar': 'var(--glass-sidebar)',
+        'glass-highlight': 'var(--glass-highlight)',
+        'glass-divider': 'var(--glass-divider)',
         
         // Keep existing theme compatibility
         border: "hsl(var(--border))",

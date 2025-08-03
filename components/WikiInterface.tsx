@@ -3,7 +3,7 @@ import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
-import { ArrowLeft, Home, Search, Loader, Download, Upload, Menu, Sun } from 'lucide-react';
+import { ArrowLeft, Home, Search, Loader, Download, Upload, Menu, Sun, Moon } from 'lucide-react';
 import { WikiPage } from './WikiPage';
 import { generateWikiPage, WikiPageData } from './WikiGenerator';
 import { ApiKeyDialog } from './ApiKeyDialog';
@@ -27,6 +27,7 @@ export function WikiInterface() {
   const [apiKey, setApiKey] = useState<string>('');
   const [sessionId, setSessionId] = useState<string>('');
   const [enableUserApiKeys, setEnableUserApiKeys] = useState<boolean>(false);
+  const [isDarkMode, setIsDarkMode] = useState<boolean>(false);
 
   // Check configuration on mount
   useEffect(() => {
@@ -35,6 +36,21 @@ export function WikiInterface() {
       .then(config => setEnableUserApiKeys(config.enableUserApiKeys))
       .catch(err => console.error('Failed to fetch config:', err));
   }, []);
+
+  // Load dark mode preference and apply theme
+  useEffect(() => {
+    const savedDarkMode = localStorage.getItem('darkMode') === 'true';
+    setIsDarkMode(savedDarkMode);
+    document.documentElement.classList.toggle('dark', savedDarkMode);
+  }, []);
+
+  // Toggle dark mode
+  const toggleDarkMode = () => {
+    const newDarkMode = !isDarkMode;
+    setIsDarkMode(newDarkMode);
+    localStorage.setItem('darkMode', newDarkMode.toString());
+    document.documentElement.classList.toggle('dark', newDarkMode);
+  };
 
   const handleApiKeySet = (key: string, newSessionId: string) => {
     setApiKey(key);
@@ -210,9 +226,10 @@ export function WikiInterface() {
             <Button
               variant="ghost"
               size="sm"
+              onClick={toggleDarkMode}
               className="text-glass-bg hover:bg-glass-bg/10 h-8 w-8 p-0"
             >
-              <Sun className="h-4 w-4" />
+              {isDarkMode ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
             </Button>
             {/* <Button
               variant="ghost"
@@ -225,7 +242,7 @@ export function WikiInterface() {
         </div>
       </nav>
 
-      <div className="pt-16 max-w-screen-2xl mx-auto flex min-h-screen">
+      <div className="pt-16 max-w-screen-2xl mx-auto flex h-[calc(100vh-4rem)]">
         {!currentPage ? (
           /* Welcome Screen */
           <div className="flex-1 flex items-center justify-center p-8">
@@ -308,8 +325,8 @@ export function WikiInterface() {
         ) : (
           <>
             {/* Left Sidebar - 280px fixed width */}
-            <aside className="w-280 bg-glass-bg border-r border-glass-divider flex flex-col">
-              <div className="p-6 border-b border-glass-divider">
+            <aside className="w-280 bg-glass-bg border-r border-glass-divider flex flex-col h-[calc(100vh-4rem)]">
+              <div className="p-6 border-b border-glass-divider flex-shrink-0">
                 <div className="flex items-center gap-2 mb-6">
                   <Button
                     variant="ghost"
@@ -342,7 +359,7 @@ export function WikiInterface() {
                 </div>
               </div>
 
-              <div className="flex-1 p-6 overflow-auto">
+              <div className="flex-1 p-6 overflow-auto min-h-0">
                 <h3 className="font-serif text-lg font-medium text-glass-text mb-4">Contents</h3>
                 <div className="space-y-2">
                   {(searchQuery ? filteredPages : Array.from(pages.values())).map(page => (
@@ -369,48 +386,13 @@ export function WikiInterface() {
                 </div>
               </div>
 
-              {/* Bottom export/import section */}
-              <div className="p-6 border-t border-glass-divider">
-                <div className="space-y-3">
-                  <Button
-                    onClick={handleExportWorldbuilding}
-                    variant="ghost"
-                    size="sm"
-                    className="w-full text-glass-sidebar hover:text-glass-text hover:bg-glass-divider/30"
-                  >
-                    <Download className="mr-2 h-4 w-4" />
-                    Export World
-                  </Button>
-                  <input
-                    type="file"
-                    accept=".json"
-                    onChange={handleImportWorldbuilding}
-                    className="hidden"
-                    id="import-sidebar"
-                    disabled={isLoading}
-                  />
-                  <label htmlFor="import-sidebar">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="w-full text-glass-sidebar hover:text-glass-text hover:bg-glass-divider/30"
-                      disabled={isLoading}
-                      asChild
-                    >
-                      <span>
-                        <Upload className="mr-2 h-4 w-4" />
-                        Import World
-                      </span>
-                    </Button>
-                  </label>
-                </div>
-              </div>
+
             </aside>
 
             {/* Main Content Area */}
             <div className="flex-1 relative">
               {isLoading && (
-                <div className="absolute inset-0 glass-panel flex items-center justify-center z-10">
+                <div className="fixed inset-0 glass-panel flex items-center justify-center z-50">
                   <div className="text-center">
                     <Loader className="h-8 w-8 animate-spin text-glass-accent mx-auto mb-4" />
                     <p className="text-glass-sidebar">Generating content...</p>

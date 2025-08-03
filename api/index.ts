@@ -110,7 +110,7 @@ app.post('/api/generate', async (req: any, res: any) => {
     const result = await generateObject({
       model: model,
       schema: z.object({
-        content: z.string().describe("The main wiki content for the page, written in a descriptive and encyclopedic style. Should be 3-4 paragraphs long. Ensure that the content only mildly tracks real world entities or concepts."),
+        content: z.string().describe("The main wiki content for the page, written in a descriptive and encyclopedic style. Should be 3-4 paragraphs long. If the user input references real-world entities, concepts and people, be sure to understand them as they are known in this world, otherwise, ensure that the content only mildly tracks real-world entities."),
         categories: z.array(z.string()).describe("A list of 2-4 relevant categories for this topic from the provided list."),
         clickableTerms: z.array(z.string()).describe("A list of 5-8 interesting terms or proper nouns from the generated content that could be clicked to generate a new wiki page. These should be exact matches to words in the content."),
         relatedConcepts: z.array(z.object({
@@ -122,7 +122,7 @@ app.post('/api/generate', async (req: any, res: any) => {
           value: z.string(),
         })).describe("A list of 3-4 basic facts about the topic in the format 'fact name: text'. Examples: 'Year: 31457AD', 'Location: Eastern Mars', 'Population: 2.3 million'. These should be single sentences and relevant to the topic.")
       }),
-      prompt: `You are a worldbuilding agent. You are profoundly knowledgeable about history, mythology, cosmology, philosophy, and anthropology from around the world (not only Western ones), and have a Borgesian imagination. Generate a wiki page for a topic within a fictional possible universe.
+      prompt: `You are a worldbuilding agent. You are profoundly knowledgeable about history, mythology, cosmology, philosophy, science, and anthropology from around the world (not only the West), and have a Borgesian or Calvino-esque imagination. Generate a wiki page for a topic within a fictional possible universe.
       
       The user has provided the following input: "${input}"
       This is a ${type === 'seed' ? 'seed sentence to start the wiki' : `term to expand upon`}.

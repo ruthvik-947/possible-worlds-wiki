@@ -1,7 +1,8 @@
 import { Card, CardContent } from './ui/card';
 import { Badge } from './ui/badge';
+import { Input } from './ui/input';
 import { WikiPageData, generateSectionContent } from './WikiGenerator';
-import { Search, User, Settings, Bell, Eye, Edit, Star, ChevronRight, ChevronDown, FileText, ChevronUp, Plus, Loader2, Download, Upload, Calendar, Clock } from 'lucide-react';
+import { Search, User, Settings, Bell, Eye, Edit, Star, ChevronRight, ChevronDown, FileText, ChevronUp, Plus, Loader2, Download, Upload, Calendar, Clock, Sun } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { WorldbuildingRecord, exportWorldbuildingRecord, importWorldbuildingRecord } from './WorldbuildingHistory';
 import { Button } from './ui/button';
@@ -132,9 +133,46 @@ export function WikiPage({ page, onTermClick, worldbuildingHistory, onWorldbuild
   };
 
   return (
-    <div className="min-h-screen bg-glass-bg flex animate-fade-in">
-      {/* Main Content Area */}
-      <main className="flex-1 px-8 py-12 overflow-auto">
+    <div className="min-h-screen bg-glass-bg">
+      {/* Fixed Top Navigation - Glass Minimalism Style */}
+      <nav className="fixed top-0 left-0 right-0 bg-glass-text z-50 h-16">
+        <div className="max-w-screen-2xl mx-auto px-6 h-full flex items-center justify-between">
+          {/* Logo */}
+          <div className="flex items-center">
+            <h1 className="text-2xl font-serif font-medium text-glass-bg tracking-wide">
+              PWW
+            </h1>
+          </div>
+
+          {/* Center Search Bar */}
+          <div className="flex-1 max-w-md mx-8">
+            <form onSubmit={handleSearch} className="relative">
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-glass-sidebar" />
+              <Input
+                placeholder="Search or generate new page..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-12 bg-glass-bg/10 border-glass-divider/30 text-glass-text placeholder:text-glass-sidebar/70 rounded-full backdrop-blur-sm focus:bg-glass-bg/20 transition-colors"
+              />
+            </form>
+          </div>
+
+          {/* Right Menu */}
+          <div className="flex items-center space-x-4">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-glass-bg hover:bg-glass-bg/10 h-8 w-8 p-0"
+            >
+              <Sun className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+      </nav>
+
+      <div className="pt-16 flex animate-fade-in">
+        {/* Main Content Area */}
+        <main className="flex-1 px-8 py-12 overflow-auto">
         <div className="max-w-720 mx-auto">
           {/* Article Title Block */}
           <header className="text-center mb-12">
@@ -267,6 +305,8 @@ export function WikiPage({ page, onTermClick, worldbuildingHistory, onWorldbuild
             <Clock className="h-4 w-4 mr-2" />
             Last edited 3 days ago
           </div>
+
+
         </div>
       </main>
 
@@ -354,13 +394,13 @@ export function WikiPage({ page, onTermClick, worldbuildingHistory, onWorldbuild
             </div>
             
             {/* Export/Import Buttons */}
-            {/* <div className="space-y-3">
+            <div className="space-y-3 pt-4 border-t border-glass-divider">
               <button
                 onClick={handleExportWorldbuilding}
                 className="w-full flex items-center justify-center space-x-2 px-4 py-3 bg-glass-accent text-glass-bg rounded-lg hover:bg-glass-accent/90 font-medium transition-colors"
               >
                 <Download className="h-4 w-4" />
-                <span>Export</span>
+                <span>Export World</span>
               </button>
               <div>
                 <input
@@ -373,14 +413,15 @@ export function WikiPage({ page, onTermClick, worldbuildingHistory, onWorldbuild
                 <label htmlFor="import-worldbuilding-page">
                   <button className="w-full flex items-center justify-center space-x-2 px-4 py-3 bg-glass-sidebar text-glass-bg rounded-lg hover:bg-glass-sidebar/90 font-medium transition-colors cursor-pointer">
                     <Upload className="h-4 w-4" />
-                    <span>Import</span>
+                    <span>Import World</span>
                   </button>
                 </label>
               </div>
-            </div> */}
+            </div>
           </div>
         )}
       </aside>
+      </div>
     </div>
   );
 }
