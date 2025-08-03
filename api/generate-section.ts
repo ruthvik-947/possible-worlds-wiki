@@ -26,9 +26,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    const model = openai('gpt-4o', {
-      apiKey: apiKey
-    });
+    const model = openai('gpt-4o');
     
     const result = await generateObject({
       model: model,
