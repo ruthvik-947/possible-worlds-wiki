@@ -1,10 +1,10 @@
-const express = require('express');
-const cors = require('cors');
-const bodyParser = require('body-parser');
-const { generateObject } = require('ai');
-const { openai } = require('@ai-sdk/openai');
-const { z } = require('zod');
-require('dotenv/config');
+import express from 'express';
+import cors from 'cors';
+import bodyParser from 'body-parser';
+import { generateObject } from 'ai';
+import { openai } from '@ai-sdk/openai';
+import { z } from 'zod';
+import 'dotenv/config';
 
 // Store API keys temporarily in memory (will be cleared on server restart)
 const activeApiKeys = new Map();

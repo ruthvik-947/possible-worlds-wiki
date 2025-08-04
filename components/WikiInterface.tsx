@@ -29,6 +29,7 @@ export function WikiInterface() {
   const [sessionId, setSessionId] = useState<string>('');
   const [enableUserApiKeys, setEnableUserApiKeys] = useState<boolean>(false);
   const [isDarkMode, setIsDarkMode] = useState<boolean>(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(true);
 
   // Check configuration on mount
   useEffect(() => {
@@ -190,10 +191,13 @@ export function WikiInterface() {
     }
   };
 
-  const filteredPages = Array.from(pages.values()).filter(page =>
-    page.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    page.content.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (searchQuery.trim() && currentPage) {
+      handleTermClick(searchQuery.trim(), currentPage.content);
+      setSearchQuery('');
+    }
+  };
 
   const currentPage = currentPageId ? pages.get(currentPageId) : null;
 
@@ -204,23 +208,35 @@ export function WikiInterface() {
         <div className="max-w-screen-2xl mx-auto px-6 h-full flex items-center justify-between">
           {/* Logo */}
           <div className="flex items-center">
+            {currentPage && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+                className="text-glass-bg hover:bg-glass-bg/10 h-8 w-8 p-0 mr-4"
+              >
+                <Menu className="h-4 w-4" />
+              </Button>
+            )}
             <h1 className="text-2xl font-serif font-medium text-glass-bg tracking-wide">
               PWW
             </h1>
           </div>
 
           {/* Center Search Bar */}
-          {/* <div className="flex-1 max-w-md mx-8">
-            <div className="relative">
-              <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-glass-sidebar" />
-              <Input
-                placeholder="Search the wiki..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-12 bg-glass-bg/10 border-glass-divider/30 text-glass-bg placeholder:text-glass-sidebar/70 rounded-full backdrop-blur-sm focus:bg-glass-bg/20 transition-colors"
-              />
+          {currentPage && (
+            <div className="flex-1 max-w-md mx-8">
+              <form onSubmit={handleSearch} className="relative">
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-glass-sidebar" />
+                <Input
+                  placeholder="Search or generate new page..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-12 bg-glass-bg/10 border-glass-divider/30 text-glass-text placeholder:text-glass-sidebar/70 rounded-full backdrop-blur-sm focus:bg-glass-bg/20 transition-colors"
+                />
+              </form>
             </div>
-          </div> */}
+          )}
 
           {/* Right Menu */}
           <div className="flex items-center space-x-4">
@@ -326,7 +342,7 @@ export function WikiInterface() {
         ) : (
           <>
             {/* Left Sidebar - 280px fixed width */}
-            <aside className="w-280 bg-glass-bg border-r border-glass-divider flex flex-col h-[calc(100vh-4rem)]">
+            <aside className={`bg-glass-bg border-r border-glass-divider flex flex-col h-[calc(100vh-4rem)] transition-all duration-300 ease-in-out overflow-hidden ${isSidebarOpen ? 'w-280' : 'w-0 border-r-0'}`}>
               <div className="p-6 border-b border-glass-divider flex-shrink-0">
                 <div className="flex items-center gap-2 mb-6">
                   <Button

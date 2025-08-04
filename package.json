@@ -7,7 +7,7 @@
   },
   "scripts": {
     "dev": "vite --force",
-    "dev:api": "ts-node-dev --respawn --transpile-only api/index.ts",
+    "dev:api": "tsx --tsconfig tsconfig.node.json api/index.ts",
     "build": "vite build",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview"
@@ -83,6 +83,7 @@
     "postcss": "^8.4.39",
     "tailwindcss": "^3.4.4",
     "ts-node-dev": "^2.0.0",
+    "tsx": "^4.20.3",
     "typescript": "^5.2.2",
     "vite": "^5.3.3"
   }
