@@ -341,8 +341,21 @@ export function WikiInterface() {
           </div>
         ) : (
           <>
-            {/* Left Sidebar - 280px fixed width */}
-            <aside className={`bg-glass-bg border-r border-glass-divider flex flex-col h-[calc(100vh-4rem)] transition-all duration-300 ease-in-out overflow-hidden ${isSidebarOpen ? 'w-280' : 'w-0 border-r-0'}`}>
+            {/* Backdrop for mobile sidebar */}
+            {isSidebarOpen && (
+              <div
+                className="fixed inset-0 bg-black/50 z-30 lg:hidden"
+                onClick={() => setIsSidebarOpen(false)}
+              ></div>
+            )}
+
+            {/* Left Sidebar */}
+            <aside
+              className={`bg-glass-bg border-r border-glass-divider flex flex-col h-[calc(100vh-4rem)] overflow-hidden transition-all duration-300 ease-in-out 
+              fixed top-16 bottom-0 left-0 z-40 w-[280px] 
+              lg:relative lg:top-0 lg:left-auto lg:bottom-auto lg:h-full
+              ${isSidebarOpen ? 'translate-x-0 lg:w-[280px]' : '-translate-x-full lg:translate-x-0 lg:w-0 lg:border-r-0'}`}
+            >
               <div className="p-6 border-b border-glass-divider flex-shrink-0">
                 <div className="flex items-center gap-2 mb-6">
                   <Button
@@ -379,7 +392,7 @@ export function WikiInterface() {
               <div className="flex-1 p-6 overflow-auto min-h-0">
                 <h3 className="font-serif text-lg font-medium text-glass-text mb-4">Contents</h3>
                 <div className="space-y-2">
-                  {(searchQuery ? filteredPages : Array.from(pages.values())).map(page => (
+                  {(searchQuery ? filteredPages(pages, searchQuery) : Array.from(pages.values())).map(page => (
                     <Button
                       key={page.id}
                       variant="ghost"
@@ -388,7 +401,10 @@ export function WikiInterface() {
                           ? "bg-glass-accent/10 text-glass-accent border border-glass-accent/20" 
                           : "text-glass-sidebar hover:text-glass-text hover:bg-glass-divider/30"
                       }`}
-                      onClick={() => navigateToPage(page.id)}
+                      onClick={() => {
+                        navigateToPage(page.id);
+                        setIsSidebarOpen(false);
+                      }}
                     >
                       <div className="w-full min-w-0">
                         <div className="font-medium text-sm mb-1 line-clamp-1 truncate">
