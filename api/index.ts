@@ -1,8 +1,12 @@
 import express from 'express';
 import cors from 'cors';
 import bodyParser from 'body-parser';
-import 'dotenv/config';
+import dotenv from 'dotenv';
 import { handleGenerate, handleGenerateSection } from './shared-handlers.js';
+
+// Load environment variables from .env.local first, then .env
+dotenv.config({ path: '.env.local' });
+dotenv.config();
 import { activeApiKeys } from './utils/shared.js';
 
 // Clean up old API keys every hour
@@ -50,7 +54,6 @@ app.post('/api/store-key', async (req: any, res: any) => {
 });
 
 app.post('/api/generate', async (req: any, res: any) => {
-  console.log('Express: Starting generation request for:', req.body.input);
 
   const { input, type, context, worldbuildingHistory, sessionId } = req.body;
 
@@ -68,14 +71,8 @@ app.post('/api/generate', async (req: any, res: any) => {
       worldbuildingHistory,
       sessionId,
       'localhost', // clientIP for development
-      (data: string) => {
-        console.log('Express: Writing data chunk:', data.substring(0, 50) + '...');
-        res.write(data);
-      },
-      () => {
-        console.log('Express: Ending response');
-        res.end();
-      }
+      (data: string) => res.write(data),
+      () => res.end()
     );
   } catch (error: any) {
     console.error('Express: Error:', error);
@@ -97,7 +94,6 @@ app.post('/api/generate', async (req: any, res: any) => {
 });
 
 app.post('/api/generate-section', async (req: any, res: any) => {
-  console.log('Express: Starting section generation for:', req.body.sectionTitle);
 
   const { sectionTitle, pageTitle, pageContent, worldbuildingHistory, sessionId } = req.body;
 
