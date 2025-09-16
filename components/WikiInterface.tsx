@@ -22,7 +22,7 @@ import {
 import { config } from '../lib/config';
 import { worldPersistence } from '../lib/worldPersistence';
 import { WorldManager } from './WorldManager';
-import { Toaster } from 'sonner';
+import { Toaster, toast } from 'sonner';
 
 export function WikiInterface() {
   const [pages, setPages] = useState<Map<string, WikiPageData>>(new Map());
@@ -44,16 +44,37 @@ export function WikiInterface() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [streamingPageData, setStreamingPageData] = useState<WikiPageData | null>(null);
   const [isStreaming, setIsStreaming] = useState<boolean>(false);
+  const [isApiDialogOpen, setIsApiDialogOpen] = useState<boolean>(false);
+
+  // Helper function to show API key required toast with link to open dialog
+  const showApiKeyRequiredToast = () => {
+    toast.error(
+      'Please set your API key first',
+      {
+        description: 'Click here to open the API key dialog',
+        action: {
+          label: 'Set API Key',
+          onClick: () => setIsApiDialogOpen(true)
+        },
+        duration: 5000
+      }
+    );
+  };
 
   // Load state from localStorage on mount
   useEffect(() => {
     const loadSavedState = () => {
-      const savedState = worldPersistence.loadCurrentWorld();
-      if (savedState && savedState.pages.length > 0) {
-        setPages(new Map(savedState.pages));
-        setCurrentPageId(savedState.currentPageId);
-        setPageHistory(savedState.pageHistory);
-        setCurrentWorld(savedState.currentWorld);
+      // Check if user is intentionally on welcome screen
+      const isOnWelcomeScreen = localStorage.getItem('pww_on_welcome_screen') === 'true';
+
+      if (!isOnWelcomeScreen) {
+        const savedState = worldPersistence.loadCurrentWorld();
+        if (savedState && savedState.pages.length > 0) {
+          setPages(new Map(savedState.pages));
+          setCurrentPageId(savedState.currentPageId);
+          setPageHistory(savedState.pageHistory);
+          setCurrentWorld(savedState.currentWorld);
+        }
       }
     };
 
@@ -105,6 +126,9 @@ export function WikiInterface() {
     loadedPageHistory: string[],
     loadedWorld: World
   ) => {
+    // Clear welcome screen flag since user is now loading a world
+    localStorage.removeItem('pww_on_welcome_screen');
+
     setPages(loadedPages);
     setCurrentWorld(loadedWorld);
 
@@ -142,11 +166,13 @@ export function WikiInterface() {
         setCurrentPageId(null);
         setPageHistory([]);
         setSeedSentence('');
-        alert(`World "${importedWorld.name}" imported successfully! You can now start generating new pages with this context.`);
+        // Use toast for success
+        toast.success(`World "${importedWorld.name}" imported successfully!`);
       })
       .catch((error) => {
         setImportError(error.message);
-        alert(`Import failed: ${error.message}`);
+        // Use toast for error with detailed message
+        toast.error(error.message);
       })
       .finally(() => {
         setIsLoading(false);
@@ -159,9 +185,12 @@ export function WikiInterface() {
 
   const handleTermClick = async (term: string, context: string) => {
     if (enableUserApiKeys && !sessionId) {
-      alert('Please set your API key first before generating content.');
+      showApiKeyRequiredToast();
       return;
     }
+
+    // Clear welcome screen flag since user is navigating to pages
+    localStorage.removeItem('pww_on_welcome_screen');
 
     // Check if page already exists
     const existingPageId = Array.from(pages.keys()).find(id =>
@@ -259,13 +288,18 @@ export function WikiInterface() {
     setPages(new Map());
     setCurrentWorld(createNewWorld());
     setSeedSentence('');
+    // Set flag to indicate user is intentionally on welcome screen
+    localStorage.setItem('pww_on_welcome_screen', 'true');
   };
 
   const generateFirstPageWithSeed = async (seed: string) => {
     if (enableUserApiKeys && !sessionId) {
-      alert('Please set your API key first before generating content.');
+      showApiKeyRequiredToast();
       return;
     }
+
+    // Clear welcome screen flag since user is now generating content
+    localStorage.removeItem('pww_on_welcome_screen');
 
     // Always start fresh - clear existing world state
     const newWorld = createNewWorld();
@@ -436,6 +470,8 @@ export function WikiInterface() {
                 onApiKeySet={handleApiKeySet}
                 isApiKeyValid={!!sessionId}
                 isLoading={isLoading}
+                open={isApiDialogOpen}
+                onOpenChange={setIsApiDialogOpen}
                 trigger={
                   <Button
                     variant="ghost"
@@ -493,7 +529,9 @@ export function WikiInterface() {
                         usageInfo={currentUsageInfo}
                         onUpgradeRequested={() => {
                           // Show upgrade message or guide user to enable API keys
-                          alert('To get unlimited usage, enable user API keys in your environment configuration and provide your own OpenAI API key.');
+                          toast.info('To get unlimited usage, enable user API keys in your environment configuration and provide your own OpenAI API key.', {
+                            duration: 8000
+                          });
                         }}
                       />
                     </div>
@@ -505,6 +543,8 @@ export function WikiInterface() {
                         onApiKeySet={handleApiKeySet}
                         isApiKeyValid={!!sessionId}
                         isLoading={isLoading}
+                        open={isApiDialogOpen}
+                        onOpenChange={setIsApiDialogOpen}
                       />
                     )}
                     <Button
@@ -603,7 +643,9 @@ export function WikiInterface() {
                       sessionId={sessionId}
                       usageInfo={currentUsageInfo}
                       onUpgradeRequested={() => {
-                        alert('To get unlimited usage, enable user API keys in your environment configuration and provide your own OpenAI API key.');
+                        toast.info('To get unlimited usage, enable user API keys in your environment configuration and provide your own OpenAI API key.', {
+                          duration: 8000
+                        });
                       }}
                     />
                   </div>

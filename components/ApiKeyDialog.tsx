@@ -17,12 +17,18 @@ interface ApiKeyDialogProps {
   isApiKeyValid: boolean;
   isLoading?: boolean;
   trigger?: React.ReactNode;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }
 
-export function ApiKeyDialog({ onApiKeySet, isApiKeyValid, isLoading = false, trigger }: ApiKeyDialogProps) {
+export function ApiKeyDialog({ onApiKeySet, isApiKeyValid, isLoading = false, trigger, open, onOpenChange }: ApiKeyDialogProps) {
   const [apiKey, setApiKey] = useState('');
   const [validationError, setValidationError] = useState<string | null>(null);
   const [isOpen, setIsOpen] = useState(false);
+
+  // Use controlled state if provided, otherwise use internal state
+  const dialogOpen = open !== undefined ? open : isOpen;
+  const setDialogOpen = onOpenChange || setIsOpen;
 
   const handleSubmit = () => {
     if (!apiKey.trim()) {
@@ -34,7 +40,7 @@ export function ApiKeyDialog({ onApiKeySet, isApiKeyValid, isLoading = false, tr
     const sessionId = Math.random().toString(36).substr(2, 9);
     
     onApiKeySet(apiKey, sessionId);
-    setIsOpen(false);
+    setDialogOpen(false);
     setApiKey('');
     setValidationError(null);
   };
@@ -46,7 +52,7 @@ export function ApiKeyDialog({ onApiKeySet, isApiKeyValid, isLoading = false, tr
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={setIsOpen}>
+    <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
       <DialogTrigger asChild>
         {trigger || (
           <Button

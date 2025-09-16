@@ -69,53 +69,98 @@ export function exportWorld(world: World, filename?: string): void {
 }
 
 export function validateWorld(data: any): data is World {
-  if (!data || typeof data !== 'object') return false;
+  const errors = validateWorldWithErrors(data);
+  return errors.length === 0;
+}
 
+export function validateWorldWithErrors(data: any): string[] {
+  const errors: string[] = [];
+
+  if (!data || typeof data !== 'object') {
+    errors.push('File must contain a valid JSON object');
+    return errors;
+  }
+
+  // Check required top-level fields
   const requiredFields = ['id', 'name', 'createdAt', 'lastModified', 'worldbuilding', 'metadata'];
   for (const field of requiredFields) {
-    if (!(field in data)) return false;
+    if (!(field in data)) {
+      errors.push(`Missing required field: ${field}`);
+    }
   }
 
-  if (typeof data.id !== 'string' ||
-      typeof data.name !== 'string' ||
-      typeof data.createdAt !== 'number' ||
-      typeof data.lastModified !== 'number') {
-    return false;
+  // Check field types
+  if ('id' in data && typeof data.id !== 'string') {
+    errors.push('Field "id" must be a string');
+  }
+  if ('name' in data && typeof data.name !== 'string') {
+    errors.push('Field "name" must be a string');
+  }
+  if ('createdAt' in data && typeof data.createdAt !== 'number') {
+    errors.push('Field "createdAt" must be a number (timestamp)');
+  }
+  if ('lastModified' in data && typeof data.lastModified !== 'number') {
+    errors.push('Field "lastModified" must be a number (timestamp)');
   }
 
-  if (!validateWorldbuildingRecord(data.worldbuilding)) {
-    return false;
+  // Validate worldbuilding structure
+  if ('worldbuilding' in data) {
+    if (!validateWorldbuildingRecord(data.worldbuilding)) {
+      errors.push('Invalid worldbuilding structure - must contain "mental", "material", and "social" categories with proper arrays');
+    }
   }
 
-  if (!data.metadata ||
-      typeof data.metadata.version !== 'string' ||
-      typeof data.metadata.entryCount !== 'number') {
-    return false;
+  // Validate metadata
+  if ('metadata' in data) {
+    if (!data.metadata || typeof data.metadata !== 'object') {
+      errors.push('Field "metadata" must be an object');
+    } else {
+      if (typeof data.metadata.version !== 'string') {
+        errors.push('Metadata field "version" must be a string');
+      }
+      if (typeof data.metadata.entryCount !== 'number') {
+        errors.push('Metadata field "entryCount" must be a number');
+      }
+    }
   }
 
-  return true;
+  return errors;
 }
 
 export function importWorld(file: File): Promise<World> {
   return new Promise((resolve, reject) => {
+    // Validate file type
+    if (!file.name.toLowerCase().endsWith('.json')) {
+      reject(new Error('File must be a JSON file (.json extension)'));
+      return;
+    }
+
+    // Validate file size (max 10MB)
+    if (file.size > 10 * 1024 * 1024) {
+      reject(new Error('File too large. Maximum size is 10MB.'));
+      return;
+    }
+
     const reader = new FileReader();
 
     reader.onload = (event) => {
       try {
         const data = JSON.parse(event.target?.result as string);
 
-        if (validateWorld(data)) {
+        const validationErrors = validateWorldWithErrors(data);
+        if (validationErrors.length === 0) {
           resolve(data as World);
         } else {
-          reject(new Error('Invalid world format'));
+          const errorMessage = 'Invalid world file structure:\n' + validationErrors.map(err => `• ${err}`).join('\n');
+          reject(new Error(errorMessage));
         }
       } catch (error) {
-        reject(new Error('Failed to parse JSON file'));
+        reject(new Error('Invalid JSON file. Please check that the file contains valid JSON data.'));
       }
     };
 
     reader.onerror = () => {
-      reject(new Error('Failed to read file'));
+      reject(new Error('Failed to read the selected file. Please try again.'));
     };
 
     reader.readAsText(file);

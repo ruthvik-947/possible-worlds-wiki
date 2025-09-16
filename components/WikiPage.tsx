@@ -6,6 +6,7 @@ import { Search, User, Settings, Bell, Eye, Edit, Star, ChevronRight, ChevronDow
 import { useState, useEffect } from 'react';
 import { WorldbuildingRecord } from './WorldbuildingHistory';
 import { Button } from './ui/button';
+import { toast } from 'sonner';
 
 interface WikiPageProps {
   page: WikiPageData;
@@ -128,7 +129,7 @@ export function WikiPage({ page, onTermClick, worldbuildingHistory, sessionId, e
   const handleAddSection = async () => {
     if (!newSectionTitle.trim()) return;
     if (enableUserApiKeys && !sessionId) {
-      alert('Please set your API key first before generating content.');
+      toast.error('Please set your API key first before generating content.');
       return;
     }
 
