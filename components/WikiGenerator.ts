@@ -66,11 +66,9 @@ export async function generateWikiPage(
 
     // Handle streaming response
     const streamingHeader = response.headers.get('x-streaming');
-    console.log('Checking streaming header:', streamingHeader);
     console.log('All response headers:', Object.fromEntries(response.headers.entries()));
 
     if (streamingHeader === 'true') {
-      console.log('Detected streaming response, setting up reader...');
       const reader = response.body?.getReader();
       if (!reader) {
         throw new Error('No response body reader available');
@@ -80,19 +78,16 @@ export async function generateWikiPage(
       let buffer = '';
       let finalData: WikiPageData | null = null;
 
-      console.log('Starting to read streaming response...');
 
       try {
         while (true) {
           const { done, value } = await reader.read();
           if (done) {
-            console.log('Streaming read completed');
             break;
           }
 
           // Decode the chunk and add to buffer
           const chunk = decoder.decode(value, { stream: true });
-          console.log('Received chunk:', chunk.substring(0, 100) + '...');
           buffer += chunk;
 
           // Process complete lines (ending with \n\n)
@@ -106,7 +101,6 @@ export async function generateWikiPage(
             if (line.trim().startsWith('data: ')) {
               try {
                 const jsonStr = line.substring(6).trim(); // Remove 'data: ' and trim
-                console.log('Parsing JSON:', jsonStr.substring(0, 100) + '...');
 
                 if (!jsonStr) {
                   console.warn('Empty JSON string after data: prefix');
@@ -121,11 +115,9 @@ export async function generateWikiPage(
 
                 if (parsedObj.isPartial && onPartialUpdate) {
                   // Send partial update to UI
-                  console.log('Calling onPartialUpdate with:', parsedObj);
                   onPartialUpdate(parsedObj);
                 } else if (parsedObj.isComplete) {
                   // Store final complete data
-                  console.log('Received final data:', parsedObj);
                   finalData = parsedObj;
                 }
               } catch (parseError) {
@@ -148,7 +140,6 @@ export async function generateWikiPage(
         reader.releaseLock();
       }
     } else {
-      console.log('No streaming header detected, attempting regular JSON parsing...');
       // Fallback to regular JSON response
       const data = await response.json();
       return data;

@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { getUsageForIP, FREE_TIER_DAILY_LIMIT, activeApiKeys } from './utils/shared.js';
+import { getUsageForIP, getFreeLimit, activeApiKeys } from './utils/shared.js';
 
 export default function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'GET') {
@@ -28,8 +28,8 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
     res.json({
       hasUserApiKey: false,
       usageCount: usage.count,
-      dailyLimit: FREE_TIER_DAILY_LIMIT,
-      remaining: Math.max(0, FREE_TIER_DAILY_LIMIT - usage.count),
+      dailyLimit: getFreeLimit(),
+      remaining: Math.max(0, getFreeLimit() - usage.count),
       unlimited: false
     });
   }

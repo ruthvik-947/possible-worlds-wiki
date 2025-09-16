@@ -2,11 +2,13 @@ import express from 'express';
 import cors from 'cors';
 import bodyParser from 'body-parser';
 import dotenv from 'dotenv';
-import { handleGenerate, handleGenerateSection } from './shared-handlers.js';
 
 // Load environment variables from .env.local first, then .env
 dotenv.config({ path: '.env.local' });
 dotenv.config();
+
+// Import these AFTER loading environment variables
+import { handleGenerate, handleGenerateSection } from './shared-handlers.js';
 import { activeApiKeys } from './utils/shared.js';
 
 // Clean up old API keys every hour

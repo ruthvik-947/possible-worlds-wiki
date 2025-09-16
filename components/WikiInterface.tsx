@@ -125,8 +125,18 @@ export function WikiInterface() {
         enableUserApiKeys ? sessionId : undefined,
         // Streaming callback
         (partialData: WikiPageData) => {
-          console.log('WikiInterface: Received streaming data:', partialData);
           setStreamingPageData(partialData);
+
+          // If this is the first callback with metadata, set up the page immediately
+          if (partialData.hasMetadata && !currentPageId) {
+            setCurrentPageId(partialData.id);
+            setPageHistory([partialData.id]);
+
+            // Add initial page data to map so WikiPage can render
+            const initialPages = new Map(pages);
+            initialPages.set(partialData.id, partialData);
+            setPages(initialPages);
+          }
         }
       );
 
@@ -143,11 +153,11 @@ export function WikiInterface() {
         firstPage.title
       );
 
-      const newPages = new Map([[firstPage.id, firstPage]]);
+      // Update with final complete data
+      const finalPages = new Map(pages);
+      finalPages.set(firstPage.id, firstPage);
 
-      setPages(newPages);
-      setCurrentPageId(firstPage.id);
-      setPageHistory([firstPage.id]);
+      setPages(finalPages);
       setWorldbuildingHistory(updatedHistory);
       setStreamingPageData(null); // Clear streaming data when complete
     } catch (error: any) {
@@ -200,7 +210,6 @@ export function WikiInterface() {
         enableUserApiKeys ? sessionId : undefined,
         // Streaming callback
         (partialData: WikiPageData) => {
-          console.log('WikiInterface: Received streaming data:', partialData);
           setStreamingPageData(partialData);
         }
       );
@@ -535,7 +544,10 @@ export function WikiInterface() {
                         }`}
                         onClick={() => {
                           navigateToPage(page.id);
-                          setIsSidebarOpen(false);
+                          // Only close sidebar on mobile (screen sizes below lg)
+                          if (window.innerWidth < 1024) {
+                            setIsSidebarOpen(false);
+                          }
                         }}
                       >
                         <div className="w-full min-w-0">
@@ -556,21 +568,16 @@ export function WikiInterface() {
                   <h3 className="font-serif text-lg font-medium text-glass-text mb-4">Worldbuilding</h3>
                   
                   {/* Worldbuilding Stats */}
-                  <div className="text-xs space-y-2 mb-4 font-mono">
-                    {Object.entries(worldbuildingHistory).map(([group, categories]) => (
-                      <div key={group}>
-                        {Object.entries(categories).map(([category, entries]) => {
-                          if ((entries as string[]).length > 0) {
-                            return (
-                              <div key={category} className="text-glass-sidebar">
-                                <span className="font-medium">{category}:</span> {(entries as string[]).length} entries
-                              </div>
-                            );
-                          }
-                          return null;
-                        })}
-                      </div>
-                    ))}
+                  <div className="text-xs space-y-1 mb-4 font-mono">
+                    {Object.entries(worldbuildingHistory).flatMap(([group, categories]) =>
+                      Object.entries(categories)
+                        .filter(([category, entries]) => (entries as string[]).length > 0)
+                        .map(([category, entries]) => (
+                          <div key={`${group}-${category}`} className="text-glass-sidebar">
+                            <span className="font-medium">{category}:</span> {(entries as string[]).length} entries
+                          </div>
+                        ))
+                    )}
                   </div>
 
                   {/* Export/Import Buttons */}
@@ -628,6 +635,7 @@ export function WikiInterface() {
                 enableUserApiKeys={enableUserApiKeys}
                 isStreaming={isStreaming}
                 streamingData={streamingPageData}
+                onUsageUpdate={setCurrentUsageInfo}
               />
             </div>
           </>

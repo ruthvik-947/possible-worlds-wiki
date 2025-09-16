@@ -9,7 +9,7 @@ import {
   hasExceededFreeLimit,
   incrementUsageForIP,
   getUsageForIP,
-  FREE_TIER_DAILY_LIMIT
+  getFreeLimit
 } from './utils/shared.js';
 
 // Helper function to generate structured metadata
@@ -32,7 +32,7 @@ export async function generateMetadata(
 
   // For testing, return mock data if no API key
   if (!process.env.OPENAI_API_KEY) {
-    console.log('No API key available, returning mock metadata for testing');
+    console.log('No API key available, returning mock metadata');
     return {
       categories: ["Magic & Mysticism", "Supernatural Phenomena"],
       clickableTerms: ["crystal formation", "levitation field", "magical resonance", "astral energy", "floating stones"],
@@ -94,11 +94,20 @@ export async function generateMetadata(
     return parseMetadata(jsonData);
   } catch (e) {
     console.error('Failed to parse metadata JSON:', e);
+    console.error('Raw text was:', accumulatedText);
+    // Fallback to mock data if parsing fails
     return {
-      categories: [],
-      clickableTerms: [],
-      relatedConcepts: [],
-      basicFacts: []
+      categories: ["Magic & Mysticism", "Supernatural Phenomena"],
+      clickableTerms: ["crystal formation", "levitation field", "magical resonance", "astral energy", "floating stones"],
+      relatedConcepts: [
+        {"term": "Ethereal Physics", "description": "The study of matter-energy interactions in mystical dimensions"},
+        {"term": "Crystalline Networks", "description": "Interconnected systems of magical crystals"}
+      ],
+      basicFacts: [
+        {"name": "Formation", "value": "Natural crystallization in high-magic zones"},
+        {"name": "Properties", "value": "Perpetual levitation and energy emission"},
+        {"name": "Rarity", "value": "Found only in ancient magical sanctuaries"}
+      ]
     };
   }
 }
@@ -159,9 +168,9 @@ export async function handleGenerate(
       throw {
         status: 429,
         error: 'Daily free limit reached',
-        message: `You've used ${usage.count}/${FREE_TIER_DAILY_LIMIT} free generations today. Please provide your own API key for unlimited usage.`,
+        message: `You've used ${usage.count}/${getFreeLimit()} free generations today. Please provide your own API key for unlimited usage.`,
         usageCount: usage.count,
-        dailyLimit: FREE_TIER_DAILY_LIMIT,
+        dailyLimit: getFreeLimit(),
         requiresApiKey: true
       };
     }
@@ -314,8 +323,8 @@ The formation process remains largely mysterious, though most agree it occurs on
     hasMetadata: true,
     usageInfo: hasUserApiKey ? null : {
       usageCount: currentUsage.count,
-      dailyLimit: FREE_TIER_DAILY_LIMIT,
-      remaining: FREE_TIER_DAILY_LIMIT - currentUsage.count
+      dailyLimit: getFreeLimit(),
+      remaining: getFreeLimit() - currentUsage.count
     }
   };
 
@@ -357,9 +366,9 @@ export async function handleGenerateSection(
       throw {
         status: 429,
         error: 'Daily free limit reached',
-        message: `You've used ${usage.count}/${FREE_TIER_DAILY_LIMIT} free generations today. Please provide your own API key for unlimited usage.`,
+        message: `You've used ${usage.count}/${getFreeLimit()} free generations today. Please provide your own API key for unlimited usage.`,
         usageCount: usage.count,
-        dailyLimit: FREE_TIER_DAILY_LIMIT,
+        dailyLimit: getFreeLimit(),
         requiresApiKey: true
       };
     }
@@ -432,8 +441,8 @@ export async function handleGenerateSection(
     isComplete: true,
     usageInfo: hasUserApiKey ? null : {
       usageCount: currentUsage.count,
-      dailyLimit: FREE_TIER_DAILY_LIMIT,
-      remaining: FREE_TIER_DAILY_LIMIT - currentUsage.count
+      dailyLimit: getFreeLimit(),
+      remaining: getFreeLimit() - currentUsage.count
     }
   };
 

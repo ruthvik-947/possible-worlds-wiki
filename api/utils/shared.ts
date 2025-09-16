@@ -9,8 +9,13 @@ interface UsageData {
 
 export const dailyUsage = new Map<string, UsageData>();
 
-// Free tier limits
-export const FREE_TIER_DAILY_LIMIT = 10;
+// Free tier limits - configurable via environment variables
+export function getFreeLimit(): number {
+  return parseInt(process.env.FREE_TIER_DAILY_LIMIT || '10', 10);
+}
+
+// For backwards compatibility
+export const FREE_TIER_DAILY_LIMIT = getFreeLimit();
 
 // Clean up old API keys every hour
 setInterval(() => {
@@ -58,7 +63,7 @@ export function hasExceededFreeLimit(ip: string): boolean {
   }
 
   const usage = getUsageForIP(ip);
-  return usage.count >= FREE_TIER_DAILY_LIMIT;
+  return usage.count >= getFreeLimit();
 }
 
 export const worldbuildingCategories = {

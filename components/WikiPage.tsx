@@ -15,6 +15,7 @@ interface WikiPageProps {
   enableUserApiKeys?: boolean;
   isStreaming?: boolean;
   streamingData?: WikiPageData | null;
+  onUsageUpdate?: (usageInfo: any) => void;
 }
 
 // Infobox component for reuse
@@ -78,7 +79,14 @@ const Infobox = ({ page }: { page: WikiPageData }) => (
   </div>
 );
 
-export function WikiPage({ page, onTermClick, worldbuildingHistory, sessionId, enableUserApiKeys = false, isStreaming = false, streamingData }: WikiPageProps) {
+export function WikiPage({ page, onTermClick, worldbuildingHistory, sessionId, enableUserApiKeys = false, isStreaming = false, streamingData, onUsageUpdate }: WikiPageProps) {
+
+  // If no page data is available, don't render anything
+  if (!page) {
+    return null;
+  }
+
+
 
   const [sections, setSections] = useState<{ title: string; content: string }[]>(page.sections || []);
   const [isAddingSection, setIsAddingSection] = useState(false);
@@ -97,7 +105,7 @@ export function WikiPage({ page, onTermClick, worldbuildingHistory, sessionId, e
     if (page.clickableTerms.length === 0) {
       return <span>{content}</span>;
     }
-  
+
     const regex = new RegExp(`(${page.clickableTerms.join('|')})`, 'g');
     const parts = content.split(regex);
 
@@ -107,7 +115,7 @@ export function WikiPage({ page, onTermClick, worldbuildingHistory, sessionId, e
           <button
             key={index}
             onClick={() => onTermClick(part, content)}
-            className="text-glass-accent hover:text-glass-accent/80 underline underline-offset-2 cursor-pointer bg-transparent border-none p-0 font-sans text-base leading-relaxed transition-colors"
+            className="text-glass-accent hover:text-glass-accent/80 underline underline-offset-2 cursor-pointer bg-transparent border-none p-0 font-sans text-body leading-relaxed transition-colors"
           >
             {part}
           </button>
@@ -137,6 +145,11 @@ export function WikiPage({ page, onTermClick, worldbuildingHistory, sessionId, e
       setSections(prev => [...prev, newSection]);
       setNewSectionTitle('');
       setIsAddingSection(false);
+
+      // Update usage info if provided and callback exists
+      if (newSection.usageInfo && onUsageUpdate) {
+        onUsageUpdate(newSection.usageInfo);
+      }
     } catch (error) {
       console.error('Failed to generate section:', error);
     } finally {
