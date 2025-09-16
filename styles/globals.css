@@ -141,9 +141,20 @@
     @apply border-border outline-ring/50;
   }
 
+  html, body {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    overflow-x: hidden;
+  }
+
   body {
     @apply bg-glass-bg text-glass-text font-sans;
     line-height: 1.6;
+  }
+
+  #root {
+    min-height: 100vh;
   }
   
   /* Glass effect utility */
@@ -213,4 +224,30 @@
 
 html {
   font-size: var(--font-size);
+}
+
+/* Streaming animations */
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in {
+  animation: fade-in 0.6s ease-out forwards;
+}
+
+@keyframes typing-indicator {
+  0%, 20% { opacity: 0.2; }
+  50% { opacity: 1; }
+  100% { opacity: 0.2; }
+}
+
+.animate-typing {
+  animation: typing-indicator 1.5s ease-in-out infinite;
 }

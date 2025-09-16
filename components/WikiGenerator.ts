@@ -10,14 +10,20 @@ export interface WikiPageData {
   relatedConcepts: { term: string; description: string }[];
   basicFacts: { name: string; value: string }[];
   sections?: { title: string; content: string }[];
+  usageInfo?: {
+    usageCount: number;
+    dailyLimit: number;
+    remaining: number;
+  } | null;
 }
 
 export async function generateWikiPage(
-  input: string, 
-  type: 'seed' | 'term', 
+  input: string,
+  type: 'seed' | 'term',
   context?: string,
   worldbuildingHistory?: WorldbuildingRecord,
-  sessionId?: string
+  sessionId?: string,
+  onPartialUpdate?: (partialData: WikiPageData) => void
 ): Promise<WikiPageData> {
   try {
     const response = await fetch(config.endpoints.generate, {
@@ -25,9 +31,9 @@ export async function generateWikiPage(
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ 
-        input, 
-        type, 
+      body: JSON.stringify({
+        input,
+        type,
         context,
         worldbuildingHistory,
         sessionId
@@ -35,14 +41,120 @@ export async function generateWikiPage(
     });
 
     if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+
+      if (response.status === 429 && errorData.requiresApiKey) {
+        // Rate limit error - include usage info
+        const error = new Error(errorData.message || 'Daily free limit reached') as any;
+        error.code = 'RATE_LIMIT_EXCEEDED';
+        error.usageInfo = {
+          usageCount: errorData.usageCount,
+          dailyLimit: errorData.dailyLimit,
+          requiresApiKey: true
+        };
+        throw error;
+      }
+
+      if (errorData.requiresApiKey) {
+        const error = new Error(errorData.message || 'API key required') as any;
+        error.code = 'API_KEY_REQUIRED';
+        throw error;
+      }
+
       throw new Error('Failed to generate wiki page');
     }
 
-    const data = await response.json();
-    return data;
+    // Handle streaming response
+    const streamingHeader = response.headers.get('x-streaming');
+    console.log('Checking streaming header:', streamingHeader);
+    console.log('All response headers:', Object.fromEntries(response.headers.entries()));
+
+    if (streamingHeader === 'true') {
+      console.log('Detected streaming response, setting up reader...');
+      const reader = response.body?.getReader();
+      if (!reader) {
+        throw new Error('No response body reader available');
+      }
+
+      const decoder = new TextDecoder();
+      let buffer = '';
+      let finalData: WikiPageData | null = null;
+
+      console.log('Starting to read streaming response...');
+
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) {
+            console.log('Streaming read completed');
+            break;
+          }
+
+          // Decode the chunk and add to buffer
+          const chunk = decoder.decode(value, { stream: true });
+          console.log('Received chunk:', chunk.substring(0, 100) + '...');
+          buffer += chunk;
+
+          // Process complete lines (ending with \n\n)
+          const lines = buffer.split('\n\n');
+
+          // Keep the last incomplete line in buffer
+          buffer = lines.pop() || '';
+
+          // Process each complete line
+          for (const line of lines) {
+            if (line.trim().startsWith('data: ')) {
+              try {
+                const jsonStr = line.substring(6).trim(); // Remove 'data: ' and trim
+                console.log('Parsing JSON:', jsonStr.substring(0, 100) + '...');
+
+                if (!jsonStr) {
+                  console.warn('Empty JSON string after data: prefix');
+                  continue;
+                }
+
+                const parsedObj = JSON.parse(jsonStr);
+
+                if (parsedObj.error) {
+                  throw new Error(parsedObj.error);
+                }
+
+                if (parsedObj.isPartial && onPartialUpdate) {
+                  // Send partial update to UI
+                  console.log('Calling onPartialUpdate with:', parsedObj);
+                  onPartialUpdate(parsedObj);
+                } else if (parsedObj.isComplete) {
+                  // Store final complete data
+                  console.log('Received final data:', parsedObj);
+                  finalData = parsedObj;
+                }
+              } catch (parseError) {
+                console.warn('Failed to parse streaming data:', parseError);
+                console.warn('Raw line:', line);
+                console.warn('JSON string:', line.substring(6));
+                continue;
+              }
+            }
+          }
+        }
+
+        if (finalData) {
+          return finalData;
+        } else {
+          throw new Error('No complete data received from stream');
+        }
+
+      } finally {
+        reader.releaseLock();
+      }
+    } else {
+      console.log('No streaming header detected, attempting regular JSON parsing...');
+      // Fallback to regular JSON response
+      const data = await response.json();
+      return data;
+    }
   } catch (error) {
     console.error("Error generating wiki page:", error);
-    // You might want to return a default error page data or re-throw the error
     throw error;
   }
 }
@@ -52,15 +164,16 @@ export async function generateSectionContent(
   pageTitle: string,
   pageContent: string,
   worldbuildingHistory?: WorldbuildingRecord,
-  sessionId?: string
-): Promise<{ title: string; content: string }> {
+  sessionId?: string,
+  onPartialUpdate?: (partialData: { title: string; content: string }) => void
+): Promise<{ title: string; content: string; usageInfo?: { usageCount: number; dailyLimit: number; remaining: number } | null }> {
   try {
     const response = await fetch(config.endpoints.generateSection, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ 
+      body: JSON.stringify({
         sectionTitle,
         pageTitle,
         pageContent,
@@ -70,11 +183,98 @@ export async function generateSectionContent(
     });
 
     if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+
+      if (response.status === 429 && errorData.requiresApiKey) {
+        // Rate limit error - include usage info
+        const error = new Error(errorData.message || 'Daily free limit reached') as any;
+        error.code = 'RATE_LIMIT_EXCEEDED';
+        error.usageInfo = {
+          usageCount: errorData.usageCount,
+          dailyLimit: errorData.dailyLimit,
+          requiresApiKey: true
+        };
+        throw error;
+      }
+
+      if (errorData.requiresApiKey) {
+        const error = new Error(errorData.message || 'API key required') as any;
+        error.code = 'API_KEY_REQUIRED';
+        throw error;
+      }
+
       throw new Error('Failed to generate section content');
     }
 
-    const data = await response.json();
-    return data;
+    // Handle streaming response
+    if (response.headers.get('x-streaming') === 'true') {
+      const reader = response.body?.getReader();
+      if (!reader) {
+        throw new Error('No response body reader available');
+      }
+
+      const decoder = new TextDecoder();
+      let buffer = '';
+      let finalData: any = null;
+
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          // Decode the chunk and add to buffer
+          const chunk = decoder.decode(value, { stream: true });
+          buffer += chunk;
+
+          // Process complete lines (ending with \n\n)
+          const lines = buffer.split('\n\n');
+
+          // Keep the last incomplete line in buffer
+          buffer = lines.pop() || '';
+
+          // Process each complete line
+          for (const line of lines) {
+            if (line.trim().startsWith('data: ')) {
+              try {
+                const jsonStr = line.substring(6); // Remove 'data: '
+                const parsedObj = JSON.parse(jsonStr);
+
+                if (parsedObj.error) {
+                  throw new Error(parsedObj.error);
+                }
+
+                if (parsedObj.isPartial && onPartialUpdate) {
+                  // Send partial update to UI
+                  onPartialUpdate({
+                    title: parsedObj.title,
+                    content: parsedObj.content
+                  });
+                } else if (parsedObj.isComplete) {
+                  // Store final complete data
+                  finalData = parsedObj;
+                }
+              } catch (parseError) {
+                console.warn('Failed to parse streaming section data:', parseError);
+                continue;
+              }
+            }
+          }
+        }
+
+        if (finalData) {
+          return finalData;
+        } else {
+          throw new Error('No complete data received from stream');
+        }
+
+      } finally {
+        reader.releaseLock();
+      }
+    } else {
+      // Fallback to regular JSON response
+      const data = await response.json();
+      return data;
+    }
   } catch (error) {
     console.error("Error generating section content:", error);
     throw error;

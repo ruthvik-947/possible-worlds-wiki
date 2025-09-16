@@ -2,150 +2,88 @@ import { Card, CardContent } from './ui/card';
 import { Badge } from './ui/badge';
 import { Input } from './ui/input';
 import { WikiPageData, generateSectionContent } from './WikiGenerator';
-import { Search, User, Settings, Bell, Eye, Edit, Star, ChevronRight, ChevronDown, FileText, ChevronUp, Plus, Loader2, Download, Upload, Calendar, Clock, Sun } from 'lucide-react';
+import { Search, User, Settings, Bell, Eye, Edit, Star, ChevronRight, ChevronDown, FileText, ChevronUp, Plus, Loader2, Calendar, Clock, Sun } from 'lucide-react';
 import { useState, useEffect } from 'react';
-import { WorldbuildingRecord, exportWorldbuildingRecord, importWorldbuildingRecord } from './WorldbuildingHistory';
+import { WorldbuildingRecord } from './WorldbuildingHistory';
 import { Button } from './ui/button';
 
 interface WikiPageProps {
   page: WikiPageData;
   onTermClick: (term: string, context: string) => void;
   worldbuildingHistory?: WorldbuildingRecord;
-  onWorldbuildingImport?: (record: WorldbuildingRecord) => void;
   sessionId?: string;
   enableUserApiKeys?: boolean;
+  isStreaming?: boolean;
+  streamingData?: WikiPageData | null;
 }
 
 // Infobox component for reuse
-const Infobox = ({
-  page,
-  worldbuildingHistory,
-  handleExportWorldbuilding,
-  handleImportWorldbuilding,
-}: {
-  page: WikiPageData;
-  worldbuildingHistory?: WorldbuildingRecord;
-  handleExportWorldbuilding: () => void;
-  handleImportWorldbuilding: (event: React.ChangeEvent<HTMLInputElement>) => void;
-}) => (
-  <>
-    <div className="flex-1">
-      {/* Infobox */}
-      <div className="glass-panel p-6 rounded-lg mb-8">
-        <h3 className="font-serif text-xl font-medium text-glass-text mb-6">
-          {page.title}
-        </h3>
+const Infobox = ({ page }: { page: WikiPageData }) => (
+  <div className="flex-1">
+    {/* Infobox */}
+    <div className="glass-panel p-6 rounded-lg mb-8">
+      <h3 className="font-serif text-xl font-medium text-glass-text mb-6">
+        {page.title}
+      </h3>
 
-        {/* Image Placeholder */}
-        <div className="mb-6">
-          <div className="bg-glass-divider/30 rounded-lg h-48 flex items-center justify-center">
-            <span className="text-glass-sidebar font-mono text-sm">Image</span>
-          </div>
+      {/* Image Placeholder */}
+      <div className="mb-6">
+        <div className="bg-glass-divider/30 rounded-lg h-48 flex items-center justify-center">
+          <span className="text-glass-sidebar font-mono text-sm">Image</span>
         </div>
+      </div>
 
-        <h4 className="font-serif font-medium text-glass-text mb-4">Basic Facts</h4>
+      <h4 className="font-serif font-medium text-glass-text mb-4">Basic Facts</h4>
 
-        <div className="space-y-3">
-          {page.basicFacts && page.basicFacts.length > 0 ? (
-            page.basicFacts.map((fact, index) => (
-              <div key={index} className="text-sm">
-                <span className="text-glass-sidebar font-medium">{fact.name}:</span>
-                <span className="text-glass-text ml-2">{fact.value}</span>
+      <div className="space-y-3">
+        {page.basicFacts && page.basicFacts.length > 0 ? (
+          page.basicFacts.map((fact, index) => (
+            <div key={index} className="text-sm">
+              <span className="text-glass-sidebar font-medium">{fact.name}:</span>
+              <span className="text-glass-text ml-2">{fact.value}</span>
+            </div>
+          ))
+        ) : (
+          <>
+            {/* Fallback content */}
+            <div className="text-sm">
+              <span className="text-glass-sidebar font-medium">Temporal range:</span>
+              <span className="text-glass-text ml-2">9,500 years ago - present</span>
+            </div>
+
+            <div>
+              <div className="inline-block bg-glass-accent text-glass-bg px-3 py-1 rounded text-sm mb-2 font-medium">
+                Conservation status
               </div>
-            ))
-          ) : (
-            <>
-              {/* Fallback content */}
-              <div className="text-sm">
-                <span className="text-glass-sidebar font-medium">Temporal range:</span>
-                <span className="text-glass-text ml-2">9,500 years ago - present</span>
-              </div>
+              <div className="text-sm text-glass-text">Domesticated</div>
+            </div>
 
-              <div>
-                <div className="inline-block bg-glass-accent text-glass-bg px-3 py-1 rounded text-sm mb-2 font-medium">
-                  Conservation status
+            <div>
+              <div className="inline-block bg-glass-accent text-glass-bg px-3 py-1 rounded text-sm mb-2 font-medium">
+                Scientific classification
+              </div>
+              <div className="space-y-1 text-sm">
+                <div className="flex items-center space-x-2">
+                  <span className="text-glass-text">Domain: Eukaryota</span>
+                  <ChevronUp className="h-3 w-3 text-glass-sidebar" />
                 </div>
-                <div className="text-sm text-glass-text">Domesticated</div>
+                <div className="text-glass-text">Kingdom: Animalia</div>
+                <div className="text-glass-text">Class: Mammalia</div>
               </div>
-
-              <div>
-                <div className="inline-block bg-glass-accent text-glass-bg px-3 py-1 rounded text-sm mb-2 font-medium">
-                  Scientific classification
-                </div>
-                <div className="space-y-1 text-sm">
-                  <div className="flex items-center space-x-2">
-                    <span className="text-glass-text">Domain: Eukaryota</span>
-                    <ChevronUp className="h-3 w-3 text-glass-sidebar" />
-                  </div>
-                  <div className="text-glass-text">Kingdom: Animalia</div>
-                  <div className="text-glass-text">Class: Mammalia</div>
-                </div>
-              </div>
-            </>
-          )}
-        </div>
+            </div>
+          </>
+        )}
       </div>
     </div>
-
-    {/* Worldbuilding History Panel */}
-    {worldbuildingHistory && (
-      <div className="glass-panel p-6 rounded-lg">
-        <h3 className="font-serif text-lg font-medium text-glass-text mb-4">Worldbuilding</h3>
-
-        {/* Worldbuilding Stats */}
-        <div className="text-xs space-y-2 mb-6 font-mono">
-          {Object.entries(worldbuildingHistory).map(([group, categories]) => (
-            <div key={group}>
-              {Object.entries(categories).map(([category, entries]) => {
-                if ((entries as string[]).length > 0) {
-                  return (
-                    <div key={category} className="text-glass-sidebar">
-                      <span className="font-medium">{category}:</span> {(entries as string[]).length} entries
-                    </div>
-                  );
-                }
-                return null;
-              })}
-            </div>
-          ))}
-        </div>
-
-        {/* Export/Import Buttons */}
-        <div className="space-y-3 pt-4 border-t border-glass-divider">
-          <button
-            onClick={handleExportWorldbuilding}
-            className="w-full flex items-center justify-center space-x-2 px-4 py-3 bg-glass-accent text-glass-bg rounded-lg hover:bg-glass-accent/90 font-medium transition-colors"
-          >
-            <Download className="h-4 w-4" />
-            <span>Export World</span>
-          </button>
-          <div>
-            <input
-              type="file"
-              accept=".json"
-              onChange={handleImportWorldbuilding}
-              className="hidden"
-              id="import-worldbuilding-page"
-            />
-            <label htmlFor="import-worldbuilding-page">
-              <button className="w-full flex items-center justify-center space-x-2 px-4 py-3 bg-glass-sidebar text-glass-bg rounded-lg hover:bg-glass-sidebar/90 font-medium transition-colors cursor-pointer">
-                <Upload className="h-4 w-4" />
-                <span>Import World</span>
-              </button>
-            </label>
-          </div>
-        </div>
-      </div>
-    )}
-  </>
+  </div>
 );
 
-export function WikiPage({ page, onTermClick, worldbuildingHistory, onWorldbuildingImport, sessionId, enableUserApiKeys = false }: WikiPageProps) {
+export function WikiPage({ page, onTermClick, worldbuildingHistory, sessionId, enableUserApiKeys = false, isStreaming = false, streamingData }: WikiPageProps) {
+
   const [sections, setSections] = useState<{ title: string; content: string }[]>(page.sections || []);
   const [isAddingSection, setIsAddingSection] = useState(false);
   const [newSectionTitle, setNewSectionTitle] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
-  const [importError, setImportError] = useState<string | null>(null);
 
   // Reset sections when page changes
   useEffect(() => {
@@ -154,47 +92,6 @@ export function WikiPage({ page, onTermClick, worldbuildingHistory, onWorldbuild
     setNewSectionTitle('');
     setIsGenerating(false);
   }, [page.id]);
-
-  const handleExportWorldbuilding = () => {
-    if (!worldbuildingHistory) {
-      alert('No worldbuilding data available to export.');
-      return;
-    }
-    
-    const totalEntries = Object.values(worldbuildingHistory).reduce((total, group) => 
-      total + Object.values(group).reduce((sum: number, entries) => sum + (entries as string[]).length, 0), 0
-    );
-    
-    if (totalEntries === 0) {
-      alert('No worldbuilding data to export. Generate some pages first!');
-      return;
-    }
-    
-    exportWorldbuildingRecord(worldbuildingHistory);
-  };
-
-  const handleImportWorldbuilding = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    setImportError(null);
-
-    importWorldbuildingRecord(file)
-      .then((importedRecord) => {
-        if (onWorldbuildingImport) {
-          onWorldbuildingImport(importedRecord);
-          alert('Worldbuilding record imported successfully!');
-        }
-      })
-      .catch((error) => {
-        setImportError(error.message);
-        alert(`Import failed: ${error.message}`);
-      })
-      .finally(() => {
-        // Reset the file input
-        event.target.value = '';
-      });
-  };
 
   const renderContentWithLinks = (content: string) => {
     if (page.clickableTerms.length === 0) {
@@ -236,7 +133,7 @@ export function WikiPage({ page, onTermClick, worldbuildingHistory, onWorldbuild
         worldbuildingHistory,
         enableUserApiKeys ? sessionId : undefined
       );
-      
+
       setSections(prev => [...prev, newSection]);
       setNewSectionTitle('');
       setIsAddingSection(false);
@@ -255,28 +152,31 @@ export function WikiPage({ page, onTermClick, worldbuildingHistory, onWorldbuild
           {/* Article Title Block */}
           <header className="text-center mb-12">
             <h1 className="font-serif text-5xl md:text-6xl font-medium text-glass-text mb-6 tracking-wide leading-tight">
-              {page.title}
+              {streamingData?.title || page.title}
             </h1>
             <div className="w-32 h-px bg-glass-divider mx-auto mb-6"></div>
           </header>
 
           {/* Mobile Infobox */}
           <div className="lg:hidden mb-8">
-            <Infobox
-              page={page}
-              worldbuildingHistory={worldbuildingHistory}
-              handleExportWorldbuilding={handleExportWorldbuilding}
-              handleImportWorldbuilding={handleImportWorldbuilding}
-            />
+            <Infobox page={page} />
           </div>
 
           {/* Main Content */}
           <article className="prose prose-lg max-w-none mb-16">
-            {page.content.split('\n\n').map((paragraph, idx) => (
-              <p key={idx} className="mb-8 text-body leading-relaxed text-glass-text font-sans">
+            {(streamingData?.content || page.content).split('\n\n').map((paragraph, idx) => (
+              <p key={idx} className={`mb-8 text-body leading-relaxed text-glass-text font-sans ${
+                isStreaming ? 'animate-fade-in' : ''
+              }`}>
                 {renderContentWithLinks(paragraph)}
               </p>
             ))}
+            {isStreaming && streamingData && (
+              <div className="flex items-center space-x-2 mt-4 animate-fade-in">
+                <div className="w-2 h-2 bg-glass-accent rounded-full animate-typing"></div>
+                <span className="text-glass-sidebar text-sm">Generating content...</span>
+              </div>
+            )}
           </article>
 
           {/* Sections */}
@@ -395,12 +295,7 @@ export function WikiPage({ page, onTermClick, worldbuildingHistory, onWorldbuild
 
       {/* Right Infobox Sidebar */}
       <aside className="w-[320px] bg-glass-bg border-l border-glass-divider p-8 flex-col hidden lg:flex h-full overflow-auto">
-        <Infobox
-          page={page}
-          worldbuildingHistory={worldbuildingHistory}
-          handleExportWorldbuilding={handleExportWorldbuilding}
-          handleImportWorldbuilding={handleImportWorldbuilding}
-        />
+        <Infobox page={page} />
       </aside>
     </div>
   );
