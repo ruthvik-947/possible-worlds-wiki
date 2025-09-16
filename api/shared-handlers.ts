@@ -1,6 +1,7 @@
 // Shared API handlers that work with both Express and Vercel
-import { streamText } from 'ai';
+import { streamText, generateObject } from 'ai';
 import { openai } from '@ai-sdk/openai';
+import { z } from 'zod';
 import {
   activeApiKeys,
   allCategories,
@@ -50,52 +51,41 @@ export async function generateMetadata(
 
   const model = openai('gpt-4o');
 
-  const result = await streamText({
-    model: model,
-    prompt: `You are a worldbuilding agent. You are deeply knowledgeable about history, mythology, cosmology, philosophy, science, and anthropology from around the world (not only the West), and have a Borgesian, and Pratchett-like imagination and a von-Neumann-esque sense of order. Generate structured metadata for a wiki page in a possible universe about "${title}".
-
-    The user has provided: "${input}"
-    This is a ${type === 'seed' ? 'seed sentence to start the wiki' : `term to expand upon`}.
-    ${context ? `The context for this term is: "${context}"` : ''}
-    ${worldbuildingHistory ? `Existing worldbuilding context: "${getWorldbuildingContext(worldbuildingHistory)}"` : ''}
-
-    Generate ONLY a JSON object with metadata for this topic. Do not include any other text.
-
-    {
-      "categories": ["category1", "category2"],
-      "clickableTerms": ["term1", "term2", "term3"],
-      "relatedConcepts": [{"term": "concept1", "description": "description1"}],
-      "basicFacts": [{"name": "fact1", "value": "value1"}]
-    }
-
-    For categories, choose 2-4 from: ${allCategories.join(', ')}
-    For clickableTerms, list 5-8 specific nouns/concepts that would be interesting to explore.
-    For relatedConcepts, list 2-4 related topics not directly mentioned.
-    For basicFacts, list 3-4 key facts about the topic.
-
-    Return only valid JSON.`
+  const metadataSchema = z.object({
+    categories: z.array(z.string()),
+    clickableTerms: z.array(z.string()),
+    relatedConcepts: z.array(z.object({
+      term: z.string(),
+      description: z.string()
+    })),
+    basicFacts: z.array(z.object({
+      name: z.string(),
+      value: z.string()
+    }))
   });
 
-  let accumulatedText = '';
-  for await (const textDelta of result.textStream) {
-    accumulatedText += textDelta;
-  }
-
   try {
-    // Remove markdown code blocks if present
-    let cleanedText = accumulatedText.trim();
-    if (cleanedText.startsWith('```json')) {
-      cleanedText = cleanedText.replace(/^```json\s*/, '').replace(/\s*```$/, '');
-    } else if (cleanedText.startsWith('```')) {
-      cleanedText = cleanedText.replace(/^```\s*/, '').replace(/\s*```$/, '');
-    }
+    const result = await generateObject({
+      model: model,
+      system: `You are a worldbuilding agent. You are deeply knowledgeable about history, mythology, cosmology, philosophy, science, and anthropology from around the world (not only the West), and have a Borgesian, and Pratchett-like imagination and a von-Neumann-esque sense of order.`,
+      prompt: `Generate structured metadata for a wiki page in a possible universe about "${title}".
 
-    const jsonData = JSON.parse(cleanedText);
-    return parseMetadata(jsonData);
+      The user has provided: "${input}"
+      This is a ${type === 'seed' ? 'seed sentence to start the wiki' : `term to expand upon`}.
+      ${context ? `The context for this term is: "${context}"` : ''}
+      ${worldbuildingHistory ? `Existing worldbuilding context: "${getWorldbuildingContext(worldbuildingHistory)}"` : ''}
+
+      For categories, choose 2-4 from: ${allCategories.join(', ')}
+      For clickableTerms, list 5-8 specific nouns/concepts that would be interesting to explore.
+      For relatedConcepts, list 2-4 related topics not directly mentioned.
+      For basicFacts, list 3-4 key facts about the topic.`,
+      schema: metadataSchema
+    });
+
+    return parseMetadata(result.object);
   } catch (e) {
-    console.error('Failed to parse metadata JSON:', e);
-    console.error('Raw text was:', accumulatedText);
-    // Fallback to mock data if parsing fails
+    console.error('Failed to generate metadata:', e);
+    // Fallback to mock data if generation fails
     return {
       categories: ["Magic & Mysticism", "Supernatural Phenomena"],
       clickableTerms: ["crystal formation", "levitation field", "magical resonance", "astral energy", "floating stones"],

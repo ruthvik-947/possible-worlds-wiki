@@ -622,7 +622,7 @@ export function WikiInterface() {
                   <div className="text-center">
                     <Loader className="h-8 w-8 animate-spin text-glass-accent mx-auto mb-4" />
                     <p className="text-glass-sidebar">
-                      {isStreaming ? 'Preparing to stream content...' : 'Initializing generation...'}
+                      {isStreaming ? 'Building world...' : 'Initializing generation...'}
                     </p>
                   </div>
                 </div>
