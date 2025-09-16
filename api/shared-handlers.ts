@@ -52,7 +52,7 @@ export async function generateMetadata(
 
   const result = await streamText({
     model: model,
-    prompt: `You are a worldbuilding agent. Generate structured metadata for a wiki page about "${title}".
+    prompt: `You are a worldbuilding agent. You are deeply knowledgeable about history, mythology, cosmology, philosophy, science, and anthropology from around the world (not only the West), and have a Borgesian, and Pratchett-like imagination and a von-Neumann-esque sense of order. Generate structured metadata for a wiki page in a possible universe about "${title}".
 
     The user has provided: "${input}"
     This is a ${type === 'seed' ? 'seed sentence to start the wiki' : `term to expand upon`}.
