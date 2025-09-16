@@ -1,8 +1,8 @@
 import { Card, CardContent } from './ui/card';
 import { Badge } from './ui/badge';
 import { Input } from './ui/input';
-import { WikiPageData, generateSectionContent } from './WikiGenerator';
-import { Search, User, Settings, Bell, Eye, Edit, Star, ChevronRight, ChevronDown, FileText, ChevronUp, Plus, Loader2, Calendar, Clock, Sun } from 'lucide-react';
+import { WikiPageData, generateSectionContent, generatePageImage } from './WikiGenerator';
+import { Search, User, Settings, Bell, Eye, Edit, Star, ChevronRight, ChevronDown, FileText, ChevronUp, Plus, Loader2, Calendar, Clock, Sun, Image as ImageIcon } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { WorldbuildingRecord } from './WorldbuildingHistory';
 import { Button } from './ui/button';
@@ -20,7 +20,19 @@ interface WikiPageProps {
 }
 
 // Infobox component for reuse
-const Infobox = ({ page }: { page: WikiPageData }) => (
+const Infobox = ({
+  page,
+  onGenerateImage,
+  generatedImageUrl,
+  isGeneratingImage,
+  imageProgress
+}: {
+  page: WikiPageData;
+  onGenerateImage: () => void;
+  generatedImageUrl?: string;
+  isGeneratingImage: boolean;
+  imageProgress?: { status: string; progress: number; message: string };
+}) => (
   <div className="flex-1">
     {/* Infobox */}
     <div className="glass-panel p-6 rounded-lg mb-8">
@@ -28,11 +40,44 @@ const Infobox = ({ page }: { page: WikiPageData }) => (
         {page.title}
       </h3>
 
-      {/* Image Placeholder */}
+      {/* Image Section */}
       <div className="mb-6">
-        <div className="bg-glass-divider/30 rounded-lg h-48 flex items-center justify-center">
-          <span className="text-glass-sidebar font-mono text-sm">Image</span>
-        </div>
+        {generatedImageUrl ? (
+          <div className="rounded-lg overflow-hidden">
+            <img
+              src={generatedImageUrl}
+              alt={`Illustration of ${page.title}`}
+              className="w-full h-48 object-cover"
+            />
+          </div>
+        ) : (
+          <div
+            className="bg-glass-divider/30 rounded-lg h-48 flex flex-col items-center justify-center cursor-pointer hover:bg-glass-divider/40 transition-colors"
+            onClick={onGenerateImage}
+          >
+            {isGeneratingImage ? (
+              <div className="text-center">
+                <Loader2 className="h-6 w-6 animate-spin text-glass-accent mx-auto mb-2" />
+                <span className="text-glass-sidebar font-mono text-xs">
+                  {imageProgress?.message || 'Generating image...'}
+                </span>
+                {imageProgress?.progress && (
+                  <div className="w-24 bg-glass-divider/30 rounded-full h-1 mt-2">
+                    <div
+                      className="bg-glass-accent h-1 rounded-full transition-all duration-300"
+                      style={{ width: `${imageProgress.progress}%` }}
+                    />
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="text-center">
+                <ImageIcon className="h-6 w-6 text-glass-sidebar mb-2" />
+                <span className="text-glass-sidebar font-mono text-sm">Click to generate image</span>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       <h4 className="font-serif font-medium text-glass-text mb-4">Basic Facts</h4>
@@ -87,19 +132,25 @@ export function WikiPage({ page, onTermClick, worldbuildingHistory, sessionId, e
     return null;
   }
 
-
-
   const [sections, setSections] = useState<{ title: string; content: string }[]>(page.sections || []);
   const [isAddingSection, setIsAddingSection] = useState(false);
   const [newSectionTitle, setNewSectionTitle] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
 
-  // Reset sections when page changes
+  // Image generation state
+  const [generatedImageUrl, setGeneratedImageUrl] = useState<string | undefined>(undefined);
+  const [isGeneratingImage, setIsGeneratingImage] = useState(false);
+  const [imageProgress, setImageProgress] = useState<{ status: string; progress: number; message: string } | undefined>(undefined);
+
+  // Reset sections and image when page changes
   useEffect(() => {
     setSections(page.sections || []);
     setIsAddingSection(false);
     setNewSectionTitle('');
     setIsGenerating(false);
+    setGeneratedImageUrl(undefined);
+    setIsGeneratingImage(false);
+    setImageProgress(undefined);
   }, [page.id]);
 
   const renderContentWithLinks = (content: string) => {
@@ -159,6 +210,44 @@ export function WikiPage({ page, onTermClick, worldbuildingHistory, sessionId, e
     }
   };
 
+  const handleGenerateImage = async () => {
+    if (isGeneratingImage) return;
+
+    setIsGeneratingImage(true);
+    setImageProgress({ status: 'generating', progress: 0, message: 'Starting image generation...' });
+
+    try {
+      const result = await generatePageImage(
+        page.title,
+        page.content,
+        worldbuildingHistory,
+        enableUserApiKeys ? sessionId : undefined,
+        (progress) => {
+          setImageProgress(progress);
+        }
+      );
+
+      setGeneratedImageUrl(result.imageUrl);
+
+      // Update usage info if provided and callback exists
+      if (result.usageInfo && onUsageUpdate) {
+        onUsageUpdate(result.usageInfo);
+      }
+
+      toast.success('Image generated successfully!');
+    } catch (error: any) {
+      console.error('Failed to generate image:', error);
+      if (error.code === 'RATE_LIMIT_EXCEEDED' || error.code === 'API_KEY_REQUIRED') {
+        toast.error(error.message || 'Please provide your API key to continue generating content.');
+      } else {
+        toast.error('Failed to generate image. Please try again.');
+      }
+    } finally {
+      setIsGeneratingImage(false);
+      setImageProgress(undefined);
+    }
+  };
+
   return (
     <div className="flex flex-col lg:flex-row animate-fade-in h-full">
       {/* Main Content Area */}
@@ -174,7 +263,13 @@ export function WikiPage({ page, onTermClick, worldbuildingHistory, sessionId, e
 
           {/* Mobile Infobox */}
           <div className="lg:hidden mb-8">
-            <Infobox page={page} />
+            <Infobox
+              page={page}
+              onGenerateImage={handleGenerateImage}
+              generatedImageUrl={generatedImageUrl}
+              isGeneratingImage={isGeneratingImage}
+              imageProgress={imageProgress}
+            />
           </div>
 
           {/* Main Content */}
@@ -310,7 +405,13 @@ export function WikiPage({ page, onTermClick, worldbuildingHistory, sessionId, e
 
       {/* Right Infobox Sidebar */}
       <aside className="w-[320px] bg-glass-bg border-l border-glass-divider p-8 flex-col hidden lg:flex h-full overflow-auto">
-        <Infobox page={page} />
+        <Infobox
+          page={page}
+          onGenerateImage={handleGenerateImage}
+          generatedImageUrl={generatedImageUrl}
+          isGeneratingImage={isGeneratingImage}
+          imageProgress={imageProgress}
+        />
       </aside>
     </div>
   );

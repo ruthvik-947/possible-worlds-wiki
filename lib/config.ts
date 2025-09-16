@@ -8,6 +8,7 @@ export const config = {
     config: `${API_BASE_URL}/api/config`,
     generate: `${API_BASE_URL}/api/generate`,
     generateSection: `${API_BASE_URL}/api/generate-section`,
+    generateImage: `${API_BASE_URL}/api/generate-image`,
     usage: `${API_BASE_URL}/api/usage`,
   }
 };

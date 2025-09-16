@@ -8,7 +8,7 @@ dotenv.config({ path: '.env.local' });
 dotenv.config();
 
 // Import these AFTER loading environment variables
-import { handleGenerate, handleGenerateSection } from './shared-handlers.js';
+import { handleGenerate, handleGenerateSection, handleImageGeneration } from './shared-handlers.js';
 import { activeApiKeys } from './utils/shared.js';
 
 // Clean up old API keys every hour
@@ -128,6 +128,42 @@ app.post('/api/generate-section', async (req: any, res: any) => {
       });
     } else {
       res.status(500).json({ error: 'Failed to generate section content' });
+    }
+  }
+});
+
+app.post('/api/generate-image', async (req: any, res: any) => {
+
+  const { pageTitle, pageContent, worldbuildingHistory, sessionId } = req.body;
+
+  // Set up streaming response headers
+  res.setHeader('Content-Type', 'text/plain');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.setHeader('X-Streaming', 'true');
+
+  try {
+    await handleImageGeneration(
+      pageTitle,
+      pageContent,
+      worldbuildingHistory,
+      sessionId,
+      'localhost', // clientIP for development
+      (data: string) => res.write(data), // writeData callback
+      () => res.end() // endResponse callback
+    );
+  } catch (error: any) {
+    console.error('Express: Image generation error:', error);
+    if (error.status) {
+      res.status(error.status).json({
+        error: error.error,
+        message: error.message,
+        usageCount: error.usageCount,
+        dailyLimit: error.dailyLimit,
+        requiresApiKey: error.requiresApiKey
+      });
+    } else {
+      res.status(500).json({ error: 'Failed to generate image' });
     }
   }
 });

@@ -274,3 +274,107 @@ export async function generateSectionContent(
     throw error;
   }
 }
+
+export async function generatePageImage(
+  pageTitle: string,
+  pageContent: string,
+  worldbuildingHistory?: WorldbuildingRecord,
+  sessionId?: string,
+  onProgress?: (progress: { status: string; progress: number; message: string }) => void
+): Promise<{ imageUrl: string; usageInfo?: { usageCount: number; dailyLimit: number; remaining: number } | null }> {
+  try {
+    const response = await fetch(config.endpoints.generateImage || '/api/generate-image', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        pageTitle,
+        pageContent,
+        worldbuildingHistory,
+        sessionId
+      }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+
+      if (response.status === 429 && errorData.requiresApiKey) {
+        const error = new Error(errorData.message || 'Daily free limit reached') as any;
+        error.code = 'RATE_LIMIT_EXCEEDED';
+        error.usageInfo = {
+          usageCount: errorData.usageCount,
+          dailyLimit: errorData.dailyLimit,
+          requiresApiKey: true
+        };
+        throw error;
+      }
+
+      if (errorData.requiresApiKey) {
+        const error = new Error(errorData.message || 'API key required') as any;
+        error.code = 'API_KEY_REQUIRED';
+        throw error;
+      }
+
+      throw new Error(errorData.message || 'Failed to generate image');
+    }
+
+    // Handle streaming response
+    if (response.headers.get('X-Streaming') === 'true') {
+      const reader = response.body!.getReader();
+      let finalData: any = null;
+
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+
+          if (done) {
+            break;
+          }
+
+          const chunk = new TextDecoder().decode(value);
+          const lines = chunk.split('\n');
+
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              try {
+                const data = line.slice(6);
+                const parsedObj = JSON.parse(data);
+
+                if (parsedObj.status === 'generating' && onProgress) {
+                  onProgress(parsedObj);
+                } else if (parsedObj.status === 'complete') {
+                  finalData = parsedObj;
+                }
+              } catch (parseError) {
+                console.warn('Failed to parse streaming image data:', parseError);
+                continue;
+              }
+            }
+          }
+        }
+
+        if (finalData) {
+          return {
+            imageUrl: finalData.imageUrl,
+            usageInfo: finalData.usageInfo
+          };
+        } else {
+          throw new Error('No complete data received from stream');
+        }
+
+      } finally {
+        reader.releaseLock();
+      }
+    } else {
+      const data = await response.json();
+      return {
+        imageUrl: data.imageUrl,
+        usageInfo: data.usageInfo
+      };
+    }
+  } catch (error) {
+    console.error("Error generating image:", error);
+    throw error;
+  }
+}

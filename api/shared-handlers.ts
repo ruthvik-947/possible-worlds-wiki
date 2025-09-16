@@ -1,5 +1,5 @@
 // Shared API handlers that work with both Express and Vercel
-import { streamText, generateObject } from 'ai';
+import { streamText, generateObject, experimental_generateImage as generateImage } from 'ai';
 import { openai } from '@ai-sdk/openai';
 import { z } from 'zod';
 import {
@@ -445,4 +445,127 @@ export async function handleGenerateSection(
   }
 
   return finalData;
+}
+
+export async function handleImageGeneration(
+  pageTitle: string,
+  pageContent: string,
+  worldbuildingHistory?: any,
+  sessionId?: string,
+  clientIP?: string,
+  writeData?: (data: string) => void,
+  endResponse?: () => void
+) {
+  // Get client IP for rate limiting (fallback for development)
+  const ip = clientIP || 'localhost';
+
+  // Use API key from session if user API keys are enabled, otherwise use environment variable
+  const enableUserApiKeys = process.env.ENABLE_USER_API_KEYS === 'true';
+  const sessionData = (enableUserApiKeys && sessionId) ? activeApiKeys.get(sessionId) : null;
+  const hasUserApiKey = !!sessionData?.apiKey;
+
+  // If no user API key, check free tier limits
+  if (!hasUserApiKey) {
+    if (hasExceededFreeLimit(ip)) {
+      const usage = getUsageForIP(ip);
+      throw {
+        status: 429,
+        error: 'Daily free limit reached',
+        message: `You've used ${usage.count}/${getFreeLimit()} free generations today. Please provide your own API key for unlimited usage.`,
+        usageCount: usage.count,
+        dailyLimit: getFreeLimit(),
+        requiresApiKey: true
+      };
+    }
+  }
+
+  const apiKey = hasUserApiKey ? sessionData!.apiKey : process.env.OPENAI_API_KEY;
+
+  if (!apiKey) {
+    throw {
+      status: 401,
+      error: 'No API key available',
+      message: 'Please provide your OpenAI API key to continue.',
+      requiresApiKey: true
+    };
+  }
+
+  // Send initial progress
+  if (writeData) {
+    writeData('data: ' + JSON.stringify({
+      status: 'generating',
+      progress: 10,
+      message: 'Creating image prompt...'
+    }) + '\n\n');
+  }
+
+  try {
+    // Create a concise image prompt based on the page content
+    const imagePrompt = `A minimalist, stylized illustration of ${pageTitle}. ${pageContent.split('.')[0]}. Simple, clean art style with muted colors, suitable for a wiki encyclopedia entry. Not photorealistic, more like a conceptual diagram or artistic interpretation.`;
+
+    if (writeData) {
+      writeData('data: ' + JSON.stringify({
+        status: 'generating',
+        progress: 30,
+        message: 'Generating image...'
+      }) + '\n\n');
+    }
+
+    const result = await generateImage({
+      model: openai.image('dall-e-3'),
+      prompt: imagePrompt,
+      n: 1,
+      size: '1024x1024',
+      providerOptions: {
+        openai: {
+          quality: 'standard',
+          style: 'natural'
+        }
+      }
+    });
+
+    if (writeData) {
+      writeData('data: ' + JSON.stringify({
+        status: 'generating',
+        progress: 90,
+        message: 'Processing image...'
+      }) + '\n\n');
+    }
+
+    // If using free tier (no user API key), increment usage count
+    if (!hasUserApiKey) {
+      incrementUsageForIP(ip);
+    }
+
+    // Get current usage for response
+    const currentUsage = getUsageForIP(ip);
+
+    const finalData = {
+      status: 'complete',
+      imageUrl: result.image.url,
+      prompt: imagePrompt,
+      usageInfo: hasUserApiKey ? null : {
+        usageCount: currentUsage.count,
+        dailyLimit: getFreeLimit(),
+        remaining: getFreeLimit() - currentUsage.count
+      }
+    };
+
+    if (writeData) {
+      writeData('data: ' + JSON.stringify(finalData) + '\n\n');
+    }
+
+    if (endResponse) {
+      endResponse();
+    }
+
+    return finalData;
+  } catch (error) {
+    console.error('Image generation error:', error);
+    throw {
+      status: 500,
+      error: 'Image generation failed',
+      message: 'Failed to generate image. Please try again.'
+    };
+  }
 }
