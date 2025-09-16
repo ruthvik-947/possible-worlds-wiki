@@ -16,9 +16,10 @@ interface ApiKeyDialogProps {
   onApiKeySet: (apiKey: string, sessionId: string) => void;
   isApiKeyValid: boolean;
   isLoading?: boolean;
+  trigger?: React.ReactNode;
 }
 
-export function ApiKeyDialog({ onApiKeySet, isApiKeyValid, isLoading = false }: ApiKeyDialogProps) {
+export function ApiKeyDialog({ onApiKeySet, isApiKeyValid, isLoading = false, trigger }: ApiKeyDialogProps) {
   const [apiKey, setApiKey] = useState('');
   const [validationError, setValidationError] = useState<string | null>(null);
   const [isOpen, setIsOpen] = useState(false);
@@ -47,27 +48,29 @@ export function ApiKeyDialog({ onApiKeySet, isApiKeyValid, isLoading = false }: 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
-        <Button
-          variant="outline"
-          size="sm"
-          className={`flex items-center gap-2 ${
-            isApiKeyValid 
-              ? 'border-green-500 text-green-600 hover:bg-green-50' 
-              : 'border-orange-500 text-orange-600 hover:bg-orange-50'
-          }`}
-        >
-          {isApiKeyValid ? (
-            <>
-              <CheckCircle className="h-4 w-4" />
-              API Key Set
-            </>
-          ) : (
-            <>
-              <Key className="h-4 w-4" />
-              Set API Key
-            </>
-          )}
-        </Button>
+        {trigger || (
+          <Button
+            variant="outline"
+            size="sm"
+            className={`flex items-center gap-2 ${
+              isApiKeyValid
+                ? 'border-green-500 text-green-600 hover:bg-green-50'
+                : 'border-orange-500 text-orange-600 hover:bg-orange-50'
+            }`}
+          >
+            {isApiKeyValid ? (
+              <>
+                <CheckCircle className="h-4 w-4" />
+                API Key Set
+              </>
+            ) : (
+              <>
+                <Key className="h-4 w-4" />
+                Set API Key
+              </>
+            )}
+          </Button>
+        )}
       </DialogTrigger>
       
       <DialogContent className="sm:max-w-md glass-panel border-glass-divider !bg-glass-bg">

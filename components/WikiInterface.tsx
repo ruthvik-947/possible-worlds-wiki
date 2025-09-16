@@ -3,7 +3,7 @@ import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
-import { ArrowLeft, Home, Search, Loader, Download, Upload, Menu, Sun, Moon } from 'lucide-react';
+import { ArrowLeft, Home, Search, Loader, Upload, Menu, Sun, Moon, Settings } from 'lucide-react';
 import { WikiPage } from './WikiPage';
 import { generateWikiPage, WikiPageData } from './WikiGenerator';
 import { ApiKeyDialog } from './ApiKeyDialog';
@@ -16,41 +16,22 @@ import {
   World,
   createNewWorld,
   updateWorldMetadata,
-  exportWorld,
   importWorld,
   getWorldStats
 } from './WorldModel';
 import { config } from '../lib/config';
+import { worldPersistence } from '../lib/worldPersistence';
+import { WorldManager } from './WorldManager';
+import { Toaster } from 'sonner';
 
 export function WikiInterface() {
-  // Load state from URL hash on mount
-  const loadStateFromUrl = () => {
-    try {
-      const hash = window.location.hash.slice(1);
-      if (hash) {
-        const state = JSON.parse(decodeURIComponent(hash));
-        return {
-          pages: new Map(state.pages),
-          currentPageId: state.currentPageId,
-          pageHistory: state.pageHistory || [],
-          currentWorld: state.currentWorld || createNewWorld()
-        };
-      }
-    } catch (e) {
-      console.error('Failed to load state from URL:', e);
-    }
-    return null;
-  };
-
-  const initialState = loadStateFromUrl();
-
-  const [pages, setPages] = useState<Map<string, WikiPageData>>(initialState?.pages || new Map());
-  const [currentPageId, setCurrentPageId] = useState<string | null>(initialState?.currentPageId || null);
+  const [pages, setPages] = useState<Map<string, WikiPageData>>(new Map());
+  const [currentPageId, setCurrentPageId] = useState<string | null>(null);
   const [seedSentence, setSeedSentence] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
-  const [pageHistory, setPageHistory] = useState<string[]>(initialState?.pageHistory || []);
+  const [pageHistory, setPageHistory] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [currentWorld, setCurrentWorld] = useState<World>(initialState?.currentWorld || createNewWorld());
+  const [currentWorld, setCurrentWorld] = useState<World>(createNewWorld());
   const [isEditingWorldName, setIsEditingWorldName] = useState(false);
   const [editedWorldName, setEditedWorldName] = useState('');
   const [importError, setImportError] = useState<string | null>(null);
@@ -64,16 +45,29 @@ export function WikiInterface() {
   const [streamingPageData, setStreamingPageData] = useState<WikiPageData | null>(null);
   const [isStreaming, setIsStreaming] = useState<boolean>(false);
 
-  // Save state to URL whenever it changes
+  // Load state from localStorage on mount
+  useEffect(() => {
+    const loadSavedState = () => {
+      const savedState = worldPersistence.loadCurrentWorld();
+      if (savedState && savedState.pages.length > 0) {
+        setPages(new Map(savedState.pages));
+        setCurrentPageId(savedState.currentPageId);
+        setPageHistory(savedState.pageHistory);
+        setCurrentWorld(savedState.currentWorld);
+      }
+    };
+
+    loadSavedState();
+  }, []);
+
+  // Auto-save state to localStorage (debounced)
   useEffect(() => {
     if (pages.size > 0) {
-      const state = {
-        pages: Array.from(pages.entries()),
-        currentPageId,
-        pageHistory,
-        currentWorld
-      };
-      window.location.hash = encodeURIComponent(JSON.stringify(state));
+      const timeoutId = setTimeout(() => {
+        worldPersistence.saveCurrentWorld(pages, currentPageId, pageHistory, currentWorld);
+      }, 1000); // Debounce saves by 1 second
+
+      return () => clearTimeout(timeoutId);
     }
   }, [pages, currentPageId, pageHistory, currentWorld]);
 
@@ -105,14 +99,34 @@ export function WikiInterface() {
     setSessionId(newSessionId);
   };
 
-  const handleExportWorld = () => {
-    if (currentWorld.metadata.entryCount === 0) {
-      alert('No worldbuilding data to export. Generate some pages first!');
-      return;
-    }
+  const handleLoadWorld = (
+    loadedPages: Map<string, WikiPageData>,
+    loadedCurrentPageId: string | null,
+    loadedPageHistory: string[],
+    loadedWorld: World
+  ) => {
+    setPages(loadedPages);
+    setCurrentWorld(loadedWorld);
 
-    exportWorld(currentWorld);
+    // If there's no current page ID but there are pages, show the first page
+    if (!loadedCurrentPageId && loadedPages.size > 0) {
+      const firstPageId = Array.from(loadedPages.keys())[0];
+      setCurrentPageId(firstPageId);
+      setPageHistory([]);
+    } else {
+      setCurrentPageId(loadedCurrentPageId);
+      setPageHistory(loadedPageHistory);
+    }
   };
+
+  const handleNewWorld = () => {
+    setPages(new Map());
+    setCurrentPageId(null);
+    setPageHistory([]);
+    setCurrentWorld(createNewWorld());
+    setSeedSentence('');
+  };
+
 
   const handleImportWorld = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -142,85 +156,6 @@ export function WikiInterface() {
   };
 
 
-  const handleGenerateFirstPage = async () => {
-    if (!seedSentence.trim()) return;
-    if (enableUserApiKeys && !sessionId) {
-      alert('Please set your API key first before generating content.');
-      return;
-    }
-    setIsLoading(true);
-    setIsStreaming(true);
-    setErrorMessage(null);
-    setStreamingPageData(null);
-
-    try {
-      const firstPage = await generateWikiPage(
-        seedSentence,
-        'seed',
-        undefined,
-        currentWorld.worldbuilding,
-        enableUserApiKeys ? sessionId : undefined,
-        // Streaming callback
-        (partialData: WikiPageData) => {
-          setStreamingPageData(partialData);
-
-          // If this is the first callback with metadata, set up the page immediately
-          if (partialData.hasMetadata && !currentPageId) {
-            setCurrentPageId(partialData.id);
-            setPageHistory([partialData.id]);
-
-            // Add initial page data to map so WikiPage can render
-            const initialPages = new Map(pages);
-            initialPages.set(partialData.id, partialData);
-            setPages(initialPages);
-          }
-        }
-      );
-
-      // Update usage info from response
-      if (firstPage.usageInfo) {
-        setCurrentUsageInfo(firstPage.usageInfo);
-      }
-
-      // Update worldbuilding history with the new page
-      const updatedWorldbuilding = updateWorldbuildingHistory(
-        currentWorld.worldbuilding,
-        firstPage.categories,
-        firstPage.content,
-        firstPage.title
-      );
-
-      // Update world with new worldbuilding data
-      const updatedWorld = updateWorldMetadata({
-        ...currentWorld,
-        worldbuilding: updatedWorldbuilding
-      });
-
-      // Update with final complete data
-      const finalPages = new Map(pages);
-      finalPages.set(firstPage.id, firstPage);
-
-      setPages(finalPages);
-      setCurrentWorld(updatedWorld);
-      setStreamingPageData(null); // Clear streaming data when complete
-    } catch (error: any) {
-      console.error('Error generating first page:', error);
-      if (error.code === 'RATE_LIMIT_EXCEEDED') {
-        setErrorMessage(error.message);
-        if (error.usageInfo) {
-          setCurrentUsageInfo(error.usageInfo);
-        }
-      } else if (error.code === 'API_KEY_REQUIRED') {
-        setErrorMessage(error.message);
-      } else {
-        setErrorMessage('Failed to generate wiki page. Please try again.');
-      }
-      setStreamingPageData(null);
-    } finally {
-      setIsLoading(false);
-      setIsStreaming(false);
-    }
-  };
 
   const handleTermClick = async (term: string, context: string) => {
     if (enableUserApiKeys && !sessionId) {
@@ -318,18 +253,116 @@ export function WikiInterface() {
   };
 
   const handleHome = () => {
-    if (pageHistory.length > 0) {
-      setCurrentPageId(pageHistory[0]);
-      setPageHistory([]);
+    // Clear everything to start fresh
+    setCurrentPageId(null);
+    setPageHistory([]);
+    setPages(new Map());
+    setCurrentWorld(createNewWorld());
+    setSeedSentence('');
+  };
+
+  const generateFirstPageWithSeed = async (seed: string) => {
+    if (enableUserApiKeys && !sessionId) {
+      alert('Please set your API key first before generating content.');
+      return;
+    }
+
+    // Always start fresh - clear existing world state
+    const newWorld = createNewWorld();
+    setCurrentWorld(newWorld);
+    setPages(new Map());
+    setCurrentPageId(null);
+    setPageHistory([]);
+
+    setIsLoading(true);
+    setIsStreaming(true);
+    setErrorMessage(null);
+    setStreamingPageData(null);
+
+    try {
+      const firstPage = await generateWikiPage(
+        seed,
+        'seed',
+        undefined,
+        newWorld.worldbuilding,
+        enableUserApiKeys ? sessionId : undefined,
+        // Streaming callback
+        (partialData: WikiPageData) => {
+          setStreamingPageData(partialData);
+
+          // If this is the first callback with metadata, set up the page immediately
+          if (partialData.hasMetadata && !currentPageId) {
+            setCurrentPageId(partialData.id);
+            setPageHistory([partialData.id]);
+
+            // Add initial page data to map so WikiPage can render
+            const initialPages = new Map();
+            initialPages.set(partialData.id, partialData);
+            setPages(initialPages);
+          }
+        }
+      );
+
+      // Update usage info from response
+      if (firstPage.usageInfo) {
+        setCurrentUsageInfo(firstPage.usageInfo);
+      }
+
+      // Update worldbuilding history with the new page
+      const updatedWorldbuilding = updateWorldbuildingHistory(
+        newWorld.worldbuilding,
+        firstPage.categories,
+        firstPage.content,
+        firstPage.title
+      );
+
+      // Update world with new worldbuilding data
+      const updatedWorld = updateWorldMetadata({
+        ...newWorld,
+        worldbuilding: updatedWorldbuilding
+      });
+
+      // Update with final complete data
+      const finalPages = new Map();
+      finalPages.set(firstPage.id, firstPage);
+
+      setPages(finalPages);
+      setCurrentWorld(updatedWorld);
+      setStreamingPageData(null); // Clear streaming data when complete
+    } catch (error: any) {
+      console.error('Error generating first page:', error);
+      if (error.code === 'RATE_LIMIT_EXCEEDED') {
+        setErrorMessage(error.message);
+        if (error.usageInfo) {
+          setCurrentUsageInfo(error.usageInfo);
+        }
+      } else if (error.code === 'API_KEY_REQUIRED') {
+        setErrorMessage(error.message);
+      } else {
+        setErrorMessage('Failed to generate wiki page. Please try again.');
+      }
+      setStreamingPageData(null);
+    } finally {
+      setIsLoading(false);
+      setIsStreaming(false);
     }
   };
 
+  const handleGenerateFirstPage = () => generateFirstPageWithSeed(seedSentence);
+
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    if (searchQuery.trim() && currentPage) {
+    if (!searchQuery.trim()) return;
+
+    if (currentPage) {
+      // We're in an existing world - search within it
       handleTermClick(searchQuery.trim(), currentPage.content);
-      setSearchQuery('');
+    } else {
+      // We're on the welcome screen - create a new world with search term
+      generateFirstPageWithSeed(searchQuery.trim());
     }
+
+    setSearchQuery('');
   };
 
   const currentPage = currentPageId ? pages.get(currentPageId) : null;
@@ -388,22 +421,33 @@ export function WikiInterface() {
           )}
 
           {/* Right Menu */}
-          <div className="flex items-center space-x-4">
+          <div className="flex items-center space-x-2">
             <Button
               variant="ghost"
               size="sm"
               onClick={toggleDarkMode}
               className="text-glass-bg hover:bg-glass-bg/10 h-8 w-8 p-0"
+              title="Toggle theme"
             >
               {isDarkMode ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
             </Button>
-            {/* <Button
-              variant="ghost"
-              size="sm"
-              className="text-glass-bg hover:bg-glass-bg/10 h-8 w-8 p-0"
-            >
-              <Menu className="h-4 w-4" />
-            </Button> */}
+            {enableUserApiKeys && (
+              <ApiKeyDialog
+                onApiKeySet={handleApiKeySet}
+                isApiKeyValid={!!sessionId}
+                isLoading={isLoading}
+                trigger={
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-glass-bg hover:bg-glass-bg/10 h-8 w-8 p-0"
+                    title="Settings"
+                  >
+                    <Settings className="h-4 w-4" />
+                  </Button>
+                }
+              />
+            )}
           </div>
         </div>
       </nav>
@@ -429,7 +473,7 @@ export function WikiInterface() {
                     Seed a world with the title of its first wiki page.
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-6 flex flex-col items-center">
+                <CardContent className="space-y-6 flex flex-col">
                   <Input
                     // placeholder="In the realm of Aethros, floating cities drift through crystal clouds..."
                     value={seedSentence}
@@ -480,28 +524,15 @@ export function WikiInterface() {
                   </div>
                   
                   <div className="pt-6 border-t border-glass-divider">
-                    <input
-                      type="file"
-                      accept=".json"
-                      onChange={handleImportWorld}
-                      className="hidden"
-                      id="import-world"
-                      disabled={isLoading}
+                    <WorldManager
+                      currentWorld={currentWorld}
+                      pages={pages}
+                      onLoadWorld={handleLoadWorld}
+                      onNewWorld={handleNewWorld}
+                      onImportWorld={handleImportWorld}
+                      isLoading={isLoading}
+                      variant="welcome"
                     />
-                    <label htmlFor="import-world">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="w-full text-sm text-glass-sidebar hover:text-glass-text hover:bg-glass-divider/30"
-                        disabled={isLoading}
-                        asChild
-                      >
-                        <span>
-                          <Upload className="mr-2 h-3 w-3" />
-                          Import existing world
-                        </span>
-                      </Button>
-                    </label>
                   </div>
                 </CardContent>
               </Card>
@@ -539,7 +570,7 @@ export function WikiInterface() {
                     variant="ghost"
                     size="sm"
                     onClick={handleHome}
-                    disabled={pageHistory.length === 0}
+                    disabled={!currentPageId}
                     className="h-8 w-8 p-0 text-glass-sidebar hover:text-glass-text hover:bg-glass-divider/30"
                   >
                     <Home className="h-4 w-4" />
@@ -646,16 +677,24 @@ export function WikiInterface() {
                         </Button>
                       </form>
                     ) : (
-                      <h3
-                        className="font-serif text-lg font-medium text-glass-text cursor-pointer hover:text-glass-accent"
-                        onClick={() => {
-                          setEditedWorldName(currentWorld.name);
-                          setIsEditingWorldName(true);
-                        }}
-                        title="Click to edit world name"
-                      >
-                        {currentWorld.name}
-                      </h3>
+                      <>
+                        <h3
+                          className="font-serif text-lg font-medium text-glass-text cursor-pointer hover:text-glass-accent flex-1 min-w-0"
+                          onClick={() => {
+                            setEditedWorldName(currentWorld.name);
+                            setIsEditingWorldName(true);
+                          }}
+                          title="Click to edit world name"
+                        >
+                          {currentWorld.name}
+                        </h3>
+                        <WorldManager
+                          currentWorld={currentWorld}
+                          pages={pages}
+                          onLoadWorld={handleLoadWorld}
+                          onNewWorld={handleNewWorld}
+                        />
+                      </>
                     )}
                   </div>
                   
@@ -663,7 +702,7 @@ export function WikiInterface() {
                   <div className="text-xs space-y-1 mb-4 font-mono">
                     {Object.entries(currentWorld.worldbuilding).flatMap(([group, categories]) =>
                       Object.entries(categories)
-                        .filter(([category, entries]) => (entries as string[]).length > 0)
+                        .filter(([, entries]) => (entries as string[]).length > 0)
                         .map(([category, entries]) => (
                           <div key={`${group}-${category}`} className="text-glass-sidebar">
                             <span className="font-medium">{category}:</span> {(entries as string[]).length} entries
@@ -672,32 +711,24 @@ export function WikiInterface() {
                     )}
                   </div>
 
-                  {/* Export/Import Buttons */}
-                  <div className="space-y-3">
-                    <button
-                      onClick={handleExportWorld}
+
+                  {/* Import Button */}
+                  <div className="pt-3 border-t border-glass-divider">
+                    <input
+                      type="file"
+                      accept=".json"
+                      onChange={handleImportWorld}
+                      className="hidden"
+                      id="import-world-sidebar"
+                      disabled={isLoading}
+                    />
+                    <label
+                      htmlFor="import-world-sidebar"
                       className="flex items-center text-sm text-glass-sidebar hover:text-glass-text underline underline-offset-2 transition-colors cursor-pointer"
                     >
-                      <Download className="mr-2 h-3 w-3" />
-                      Export World
-                    </button>
-                    <div>
-                      <input
-                        type="file"
-                        accept=".json"
-                        onChange={handleImportWorld}
-                        className="hidden"
-                        id="import-world-sidebar"
-                        disabled={isLoading}
-                      />
-                      <label
-                        htmlFor="import-world-sidebar"
-                        className="flex items-center text-sm text-glass-sidebar hover:text-glass-text underline underline-offset-2 transition-colors cursor-pointer"
-                      >
-                        <Upload className="mr-2 h-3 w-3" />
-                        Import World
-                      </label>
-                    </div>
+                      <Upload className="mr-2 h-3 w-3" />
+                      Import World Attributes
+                    </label>
                   </div>
                 </div>
               </div>
@@ -733,6 +764,7 @@ export function WikiInterface() {
           </>
         )}
       </div>
+      <Toaster position="bottom-right" theme={isDarkMode ? 'dark' : 'light'} />
     </div>
   );
 }

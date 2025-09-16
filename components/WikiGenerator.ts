@@ -15,6 +15,9 @@ export interface WikiPageData {
     dailyLimit: number;
     remaining: number;
   } | null;
+  hasMetadata?: boolean;
+  isPartial?: boolean;
+  progress?: number;
 }
 
 export async function generateWikiPage(
