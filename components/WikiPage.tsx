@@ -17,6 +17,8 @@ interface WikiPageProps {
   isStreaming?: boolean;
   streamingData?: WikiPageData | null;
   onUsageUpdate?: (usageInfo: any) => void;
+  generatedImageUrl?: string;
+  onImageGenerated?: (pageId: string, imageUrl: string) => void;
 }
 
 // Infobox component for reuse
@@ -125,7 +127,7 @@ const Infobox = ({
   </div>
 );
 
-export function WikiPage({ page, onTermClick, worldbuildingHistory, sessionId, enableUserApiKeys = false, isStreaming = false, streamingData, onUsageUpdate }: WikiPageProps) {
+export function WikiPage({ page, onTermClick, worldbuildingHistory, sessionId, enableUserApiKeys = false, isStreaming = false, streamingData, onUsageUpdate, generatedImageUrl, onImageGenerated }: WikiPageProps) {
 
   // If no page data is available, don't render anything
   if (!page) {
@@ -138,17 +140,15 @@ export function WikiPage({ page, onTermClick, worldbuildingHistory, sessionId, e
   const [isGenerating, setIsGenerating] = useState(false);
 
   // Image generation state
-  const [generatedImageUrl, setGeneratedImageUrl] = useState<string | undefined>(undefined);
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
   const [imageProgress, setImageProgress] = useState<{ status: string; progress: number; message: string } | undefined>(undefined);
 
-  // Reset sections and image when page changes
+  // Reset sections when page changes
   useEffect(() => {
     setSections(page.sections || []);
     setIsAddingSection(false);
     setNewSectionTitle('');
     setIsGenerating(false);
-    setGeneratedImageUrl(undefined);
     setIsGeneratingImage(false);
     setImageProgress(undefined);
   }, [page.id]);
@@ -227,7 +227,9 @@ export function WikiPage({ page, onTermClick, worldbuildingHistory, sessionId, e
         }
       );
 
-      setGeneratedImageUrl(result.imageUrl);
+      if (onImageGenerated) {
+        onImageGenerated(page.id, result.imageUrl);
+      }
 
       // Update usage info if provided and callback exists
       if (result.usageInfo && onUsageUpdate) {

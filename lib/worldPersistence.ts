@@ -12,6 +12,7 @@ export interface WikiState {
   pageHistory: string[];
   currentWorld: World;
   lastModified: number;
+  pageImages?: [string, string][]; // Optional for backward compatibility
 }
 
 export interface SavedWorld {
@@ -108,7 +109,8 @@ class WorldPersistence {
         currentPageId: state.currentPageId || null,
         pageHistory: state.pageHistory || [],
         currentWorld: state.currentWorld || createNewWorld(),
-        lastModified: state.lastModified || Date.now()
+        lastModified: state.lastModified || Date.now(),
+        pageImages: state.pageImages || undefined
       };
     } catch (error) {
       console.error('State migration failed:', error);
@@ -121,7 +123,8 @@ class WorldPersistence {
     pages: Map<string, WikiPageData>,
     currentPageId: string | null,
     pageHistory: string[],
-    currentWorld: World
+    currentWorld: World,
+    pageImages?: Map<string, string>
   ): boolean {
     if (!this.isStorageAvailable()) {
       console.warn('localStorage not available');
@@ -135,7 +138,8 @@ class WorldPersistence {
         currentPageId,
         pageHistory,
         currentWorld,
-        lastModified: Date.now()
+        lastModified: Date.now(),
+        pageImages: pageImages ? Array.from(pageImages.entries()) : undefined
       };
 
       const serialized = this.serialize(state);
@@ -163,7 +167,8 @@ class WorldPersistence {
             currentPageId,
             pageHistory,
             currentWorld,
-            lastModified: Date.now()
+            lastModified: Date.now(),
+            pageImages: pageImages ? Array.from(pageImages.entries()) : undefined
           };
           localStorage.setItem(CURRENT_WORLD_KEY, this.serialize(state));
           return true;
@@ -198,7 +203,7 @@ class WorldPersistence {
   }
 
   // Save a named world (overwrites if name exists)
-  saveNamedWorld(name: string, pages: Map<string, WikiPageData>, currentWorld: World): boolean {
+  saveNamedWorld(name: string, pages: Map<string, WikiPageData>, currentWorld: World, pageImages?: Map<string, string>): boolean {
     if (!this.isStorageAvailable() || !name.trim()) return false;
 
     try {
@@ -223,7 +228,8 @@ class WorldPersistence {
         currentPageId: pages.size > 0 ? Array.from(pages.keys())[0] : null,
         pageHistory: [],
         currentWorld: { ...currentWorld, name: trimmedName },
-        lastModified: Date.now()
+        lastModified: Date.now(),
+        pageImages: pageImages ? Array.from(pageImages.entries()) : undefined
       };
 
       // Save the world data

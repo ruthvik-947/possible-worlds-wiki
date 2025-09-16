@@ -540,9 +540,14 @@ export async function handleImageGeneration(
     // Get current usage for response
     const currentUsage = getUsageForIP(ip);
 
+    // The AI SDK v5 returns images as an array with base64Data, not URLs
+    const imageUrl = result.images && result.images.length > 0
+      ? `data:${result.images[0].mediaType};base64,${result.images[0].base64Data}`
+      : null;
+
     const finalData = {
       status: 'complete',
-      imageUrl: result.image.url,
+      imageUrl: imageUrl,
       prompt: imagePrompt,
       usageInfo: hasUserApiKey ? null : {
         usageCount: currentUsage.count,
@@ -550,6 +555,7 @@ export async function handleImageGeneration(
         remaining: getFreeLimit() - currentUsage.count
       }
     };
+
 
     if (writeData) {
       writeData('data: ' + JSON.stringify(finalData) + '\n\n');

@@ -45,6 +45,7 @@ export function WikiInterface() {
   const [streamingPageData, setStreamingPageData] = useState<WikiPageData | null>(null);
   const [isStreaming, setIsStreaming] = useState<boolean>(false);
   const [isApiDialogOpen, setIsApiDialogOpen] = useState<boolean>(false);
+  const [pageImages, setPageImages] = useState<Map<string, string>>(new Map());
 
   // Helper function to show API key required toast with link to open dialog
   const showApiKeyRequiredToast = () => {
@@ -74,6 +75,9 @@ export function WikiInterface() {
           setCurrentPageId(savedState.currentPageId);
           setPageHistory(savedState.pageHistory);
           setCurrentWorld(savedState.currentWorld);
+          if (savedState.pageImages) {
+            setPageImages(new Map(savedState.pageImages));
+          }
         }
       }
     };
@@ -85,12 +89,12 @@ export function WikiInterface() {
   useEffect(() => {
     if (pages.size > 0) {
       const timeoutId = setTimeout(() => {
-        worldPersistence.saveCurrentWorld(pages, currentPageId, pageHistory, currentWorld);
+        worldPersistence.saveCurrentWorld(pages, currentPageId, pageHistory, currentWorld, pageImages);
       }, 1000); // Debounce saves by 1 second
 
       return () => clearTimeout(timeoutId);
     }
-  }, [pages, currentPageId, pageHistory, currentWorld]);
+  }, [pages, currentPageId, pageHistory, currentWorld, pageImages]);
 
   // Check configuration on mount
   useEffect(() => {
@@ -124,13 +128,19 @@ export function WikiInterface() {
     loadedPages: Map<string, WikiPageData>,
     loadedCurrentPageId: string | null,
     loadedPageHistory: string[],
-    loadedWorld: World
+    loadedWorld: World,
+    loadedPageImages?: Map<string, string>
   ) => {
     // Clear welcome screen flag since user is now loading a world
     localStorage.removeItem('pww_on_welcome_screen');
 
     setPages(loadedPages);
     setCurrentWorld(loadedWorld);
+    if (loadedPageImages) {
+      setPageImages(loadedPageImages);
+    } else {
+      setPageImages(new Map());
+    }
 
     // If there's no current page ID but there are pages, show the first page
     if (!loadedCurrentPageId && loadedPages.size > 0) {
@@ -149,6 +159,7 @@ export function WikiInterface() {
     setPageHistory([]);
     setCurrentWorld(createNewWorld());
     setSeedSentence('');
+    setPageImages(new Map());
   };
 
 
@@ -289,6 +300,7 @@ export function WikiInterface() {
     setPages(new Map());
     setCurrentWorld(createNewWorld());
     setSeedSentence('');
+    setPageImages(new Map());
     // Set flag to indicate user is intentionally on welcome screen
     localStorage.setItem('pww_on_welcome_screen', 'true');
   };
@@ -303,6 +315,7 @@ export function WikiInterface() {
     setPages(new Map());
     setCurrentPageId(null);
     setPageHistory([]);
+    setPageImages(new Map());
 
     setIsLoading(true);
     setIsStreaming(true);
@@ -402,6 +415,10 @@ export function WikiInterface() {
   };
 
   const currentPage = currentPageId ? pages.get(currentPageId) : null;
+
+  const handleImageGenerated = (pageId: string, imageUrl: string) => {
+    setPageImages(prev => new Map(prev).set(pageId, imageUrl));
+  };
 
   const filteredPages = (pages: Map<string, WikiPageData>, query: string) => {
     const searchTerm = query.toLowerCase();
@@ -569,6 +586,7 @@ export function WikiInterface() {
                     <WorldManager
                       currentWorld={currentWorld}
                       pages={pages}
+                      pageImages={pageImages}
                       onLoadWorld={handleLoadWorld}
                       onNewWorld={handleNewWorld}
                       onImportWorld={handleImportWorld}
@@ -735,6 +753,7 @@ export function WikiInterface() {
                         <WorldManager
                           currentWorld={currentWorld}
                           pages={pages}
+                          pageImages={pageImages}
                           onLoadWorld={handleLoadWorld}
                           onNewWorld={handleNewWorld}
                         />
@@ -771,7 +790,7 @@ export function WikiInterface() {
                       className="flex items-center text-sm text-glass-sidebar hover:text-glass-text underline underline-offset-2 transition-colors cursor-pointer"
                     >
                       <Upload className="mr-2 h-3 w-3" />
-                      Import World Attributes
+                      Import world attributes
                     </label>
                   </div>
                 </div>
@@ -803,6 +822,8 @@ export function WikiInterface() {
                 isStreaming={isStreaming}
                 streamingData={streamingPageData}
                 onUsageUpdate={setCurrentUsageInfo}
+                generatedImageUrl={currentPageId ? pageImages.get(currentPageId) : undefined}
+                onImageGenerated={handleImageGenerated}
               />
             </div>
           </>

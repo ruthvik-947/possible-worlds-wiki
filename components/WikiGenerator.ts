@@ -323,6 +323,7 @@ export async function generatePageImage(
     if (response.headers.get('X-Streaming') === 'true') {
       const reader = response.body!.getReader();
       let finalData: any = null;
+      let buffer = ''; // Buffer for incomplete JSON
 
       try {
         while (true) {
@@ -333,12 +334,18 @@ export async function generatePageImage(
           }
 
           const chunk = new TextDecoder().decode(value);
-          const lines = chunk.split('\n');
+          buffer += chunk;
+
+          // Split by lines and keep incomplete line in buffer
+          const lines = buffer.split('\n');
+          buffer = lines.pop() || ''; // Keep the last (potentially incomplete) line in buffer
 
           for (const line of lines) {
             if (line.startsWith('data: ')) {
               try {
                 const data = line.slice(6);
+                if (data.trim() === '') continue; // Skip empty data lines
+
                 const parsedObj = JSON.parse(data);
 
                 if (parsedObj.status === 'generating' && onProgress) {
@@ -347,10 +354,25 @@ export async function generatePageImage(
                   finalData = parsedObj;
                 }
               } catch (parseError) {
-                console.warn('Failed to parse streaming image data:', parseError);
+                console.warn('Failed to parse streaming image data:', parseError.message.substring(0, 100));
                 continue;
               }
             }
+          }
+        }
+
+        // Process any remaining data in buffer
+        if (buffer && buffer.startsWith('data: ')) {
+          try {
+            const data = buffer.slice(6);
+            if (data.trim()) {
+              const parsedObj = JSON.parse(data);
+              if (parsedObj.status === 'complete') {
+                finalData = parsedObj;
+              }
+            }
+          } catch (parseError) {
+            console.warn('Failed to parse final buffered data:', parseError);
           }
         }
 

@@ -11,14 +11,15 @@ import { toast } from 'sonner';
 interface WorldManagerProps {
   currentWorld: World;
   pages: Map<string, WikiPageData>;
-  onLoadWorld: (pages: Map<string, WikiPageData>, currentPageId: string | null, pageHistory: string[], world: World) => void;
+  pageImages?: Map<string, string>;
+  onLoadWorld: (pages: Map<string, WikiPageData>, currentPageId: string | null, pageHistory: string[], world: World, pageImages?: Map<string, string>) => void;
   onNewWorld: () => void;
   onImportWorld?: (event: React.ChangeEvent<HTMLInputElement>) => void;
   isLoading?: boolean;
   variant?: 'inline' | 'welcome';
 }
 
-export function WorldManager({ currentWorld, pages, onLoadWorld, onNewWorld, onImportWorld, isLoading: parentLoading = false, variant = 'inline' }: WorldManagerProps) {
+export function WorldManager({ currentWorld, pages, pageImages, onLoadWorld, onNewWorld, onImportWorld, isLoading: parentLoading = false, variant = 'inline' }: WorldManagerProps) {
   const [savedWorlds, setSavedWorlds] = useState<SavedWorld[]>([]);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -45,7 +46,7 @@ export function WorldManager({ currentWorld, pages, onLoadWorld, onNewWorld, onI
     // Check if world with this name already exists
     const existingWorld = savedWorlds.find(world => world.name === currentWorld.name);
 
-    const success = worldPersistence.saveNamedWorld(currentWorld.name, pages, currentWorld);
+    const success = worldPersistence.saveNamedWorld(currentWorld.name, pages, currentWorld, pageImages);
 
     if (success) {
       refreshWorldsList();
@@ -66,7 +67,8 @@ export function WorldManager({ currentWorld, pages, onLoadWorld, onNewWorld, onI
 
     if (worldState) {
       const pagesMap = new Map(worldState.pages);
-      onLoadWorld(pagesMap, worldState.currentPageId, worldState.pageHistory, worldState.currentWorld);
+      const imagesMap = worldState.pageImages ? new Map(worldState.pageImages) : undefined;
+      onLoadWorld(pagesMap, worldState.currentPageId, worldState.pageHistory, worldState.currentWorld, imagesMap);
       setIsDialogOpen(false);
       toast.success(`World "${worldState.currentWorld.name}" loaded`);
     } else {
@@ -288,7 +290,7 @@ export function WorldManager({ currentWorld, pages, onLoadWorld, onNewWorld, onI
               >
                 <span>
                   <Upload className="mr-2 h-3 w-3" />
-                  Import World Attributes
+                  Import world attributes
                 </span>
               </Button>
             </label>
