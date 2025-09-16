@@ -81,7 +81,7 @@ export function ApiKeyDialog({ onApiKeySet, isApiKeyValid, isLoading = false }: 
         <div className="space-y-4">
           <div className="space-y-2">
             <label htmlFor="api-key" className="text-sm font-medium text-glass-text">
-              Enter your OpenAI API key
+              Enter your <a href="https://platform.openai.com/api-keys" target="_blank" className="text-blue-600 hover:text-blue-700 underline">OpenAI API key</a>
             </label>
                          <Input
                id="api-key"

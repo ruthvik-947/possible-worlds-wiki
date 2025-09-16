@@ -8,23 +8,51 @@ import { WikiPage } from './WikiPage';
 import { generateWikiPage, WikiPageData } from './WikiGenerator';
 import { ApiKeyDialog } from './ApiKeyDialog';
 import { UsageIndicator } from './UsageIndicator';
-import { 
-  WorldbuildingRecord, 
-  createEmptyWorldbuildingRecord, 
-  updateWorldbuildingHistory,
-  exportWorldbuildingRecord,
-  importWorldbuildingRecord
+import {
+  WorldbuildingRecord,
+  updateWorldbuildingHistory
 } from './WorldbuildingHistory';
+import {
+  World,
+  createNewWorld,
+  updateWorldMetadata,
+  exportWorld,
+  importWorld,
+  getWorldStats
+} from './WorldModel';
 import { config } from '../lib/config';
 
 export function WikiInterface() {
-  const [pages, setPages] = useState<Map<string, WikiPageData>>(new Map());
-  const [currentPageId, setCurrentPageId] = useState<string | null>(null);
+  // Load state from URL hash on mount
+  const loadStateFromUrl = () => {
+    try {
+      const hash = window.location.hash.slice(1);
+      if (hash) {
+        const state = JSON.parse(decodeURIComponent(hash));
+        return {
+          pages: new Map(state.pages),
+          currentPageId: state.currentPageId,
+          pageHistory: state.pageHistory || [],
+          currentWorld: state.currentWorld || createNewWorld()
+        };
+      }
+    } catch (e) {
+      console.error('Failed to load state from URL:', e);
+    }
+    return null;
+  };
+
+  const initialState = loadStateFromUrl();
+
+  const [pages, setPages] = useState<Map<string, WikiPageData>>(initialState?.pages || new Map());
+  const [currentPageId, setCurrentPageId] = useState<string | null>(initialState?.currentPageId || null);
   const [seedSentence, setSeedSentence] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
-  const [pageHistory, setPageHistory] = useState<string[]>([]);
+  const [pageHistory, setPageHistory] = useState<string[]>(initialState?.pageHistory || []);
   const [isLoading, setIsLoading] = useState(false);
-  const [worldbuildingHistory, setWorldbuildingHistory] = useState<WorldbuildingRecord>(createEmptyWorldbuildingRecord());
+  const [currentWorld, setCurrentWorld] = useState<World>(initialState?.currentWorld || createNewWorld());
+  const [isEditingWorldName, setIsEditingWorldName] = useState(false);
+  const [editedWorldName, setEditedWorldName] = useState('');
   const [importError, setImportError] = useState<string | null>(null);
   const [apiKey, setApiKey] = useState<string>('');
   const [sessionId, setSessionId] = useState<string>('');
@@ -35,6 +63,19 @@ export function WikiInterface() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [streamingPageData, setStreamingPageData] = useState<WikiPageData | null>(null);
   const [isStreaming, setIsStreaming] = useState<boolean>(false);
+
+  // Save state to URL whenever it changes
+  useEffect(() => {
+    if (pages.size > 0) {
+      const state = {
+        pages: Array.from(pages.entries()),
+        currentPageId,
+        pageHistory,
+        currentWorld
+      };
+      window.location.hash = encodeURIComponent(JSON.stringify(state));
+    }
+  }, [pages, currentPageId, pageHistory, currentWorld]);
 
   // Check configuration on mount
   useEffect(() => {
@@ -64,34 +105,30 @@ export function WikiInterface() {
     setSessionId(newSessionId);
   };
 
-  const handleExportWorldbuilding = () => {
-    const totalEntries = Object.values(worldbuildingHistory).reduce((total, group) => 
-      total + Object.values(group).reduce((sum: number, entries) => sum + (entries as string[]).length, 0), 0
-    );
-    
-    if (totalEntries === 0) {
+  const handleExportWorld = () => {
+    if (currentWorld.metadata.entryCount === 0) {
       alert('No worldbuilding data to export. Generate some pages first!');
       return;
     }
-    
-    exportWorldbuildingRecord(worldbuildingHistory);
+
+    exportWorld(currentWorld);
   };
 
-  const handleImportWorldbuilding = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImportWorld = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
     setImportError(null);
     setIsLoading(true);
 
-    importWorldbuildingRecord(file)
-      .then((importedRecord) => {
-        setWorldbuildingHistory(importedRecord);
+    importWorld(file)
+      .then((importedWorld) => {
+        setCurrentWorld(importedWorld);
         setPages(new Map()); // Clear existing pages
         setCurrentPageId(null);
         setPageHistory([]);
         setSeedSentence('');
-        alert('Worldbuilding record imported successfully! You can now start generating new pages with this context.');
+        alert(`World "${importedWorld.name}" imported successfully! You can now start generating new pages with this context.`);
       })
       .catch((error) => {
         setImportError(error.message);
@@ -121,7 +158,7 @@ export function WikiInterface() {
         seedSentence,
         'seed',
         undefined,
-        worldbuildingHistory,
+        currentWorld.worldbuilding,
         enableUserApiKeys ? sessionId : undefined,
         // Streaming callback
         (partialData: WikiPageData) => {
@@ -146,19 +183,25 @@ export function WikiInterface() {
       }
 
       // Update worldbuilding history with the new page
-      const updatedHistory = updateWorldbuildingHistory(
-        worldbuildingHistory,
+      const updatedWorldbuilding = updateWorldbuildingHistory(
+        currentWorld.worldbuilding,
         firstPage.categories,
         firstPage.content,
         firstPage.title
       );
+
+      // Update world with new worldbuilding data
+      const updatedWorld = updateWorldMetadata({
+        ...currentWorld,
+        worldbuilding: updatedWorldbuilding
+      });
 
       // Update with final complete data
       const finalPages = new Map(pages);
       finalPages.set(firstPage.id, firstPage);
 
       setPages(finalPages);
-      setWorldbuildingHistory(updatedHistory);
+      setCurrentWorld(updatedWorld);
       setStreamingPageData(null); // Clear streaming data when complete
     } catch (error: any) {
       console.error('Error generating first page:', error);
@@ -206,7 +249,7 @@ export function WikiInterface() {
         term,
         'term',
         context,
-        worldbuildingHistory,
+        currentWorld.worldbuilding,
         enableUserApiKeys ? sessionId : undefined,
         // Streaming callback
         (partialData: WikiPageData) => {
@@ -220,18 +263,24 @@ export function WikiInterface() {
       }
 
       // Update worldbuilding history with the new page
-      const updatedHistory = updateWorldbuildingHistory(
-        worldbuildingHistory,
+      const updatedWorldbuilding = updateWorldbuildingHistory(
+        currentWorld.worldbuilding,
         newPage.categories,
         newPage.content,
         newPage.title
       );
 
+      // Update world with new worldbuilding data
+      const updatedWorld = updateWorldMetadata({
+        ...currentWorld,
+        worldbuilding: updatedWorldbuilding
+      });
+
       const newPages = new Map(pages);
       newPages.set(newPage.id, newPage);
 
       setPages(newPages);
-      setWorldbuildingHistory(updatedHistory);
+      setCurrentWorld(updatedWorld);
       navigateToPage(newPage.id);
       setStreamingPageData(null); // Clear streaming data when complete
     } catch (error: any) {
@@ -434,12 +483,12 @@ export function WikiInterface() {
                     <input
                       type="file"
                       accept=".json"
-                      onChange={handleImportWorldbuilding}
+                      onChange={handleImportWorld}
                       className="hidden"
-                      id="import-worldbuilding"
+                      id="import-world"
                       disabled={isLoading}
                     />
-                    <label htmlFor="import-worldbuilding">
+                    <label htmlFor="import-world">
                       <Button
                         variant="ghost"
                         size="sm"
@@ -565,11 +614,54 @@ export function WikiInterface() {
                 
                 {/* Worldbuilding Stats Section - Fixed at bottom */}
                 <div className="border-t border-glass-divider pt-4 mt-4 flex-shrink-0">
-                  <h3 className="font-serif text-lg font-medium text-glass-text mb-4">Worldbuilding</h3>
+                  <div className="flex items-center justify-between mb-4">
+                    {isEditingWorldName ? (
+                      <form
+                        onSubmit={(e) => {
+                          e.preventDefault();
+                          if (editedWorldName.trim()) {
+                            setCurrentWorld({
+                              ...currentWorld,
+                              name: editedWorldName.trim(),
+                              lastModified: Date.now()
+                            });
+                          }
+                          setIsEditingWorldName(false);
+                        }}
+                        className="flex items-center gap-2 flex-1"
+                      >
+                        <Input
+                          value={editedWorldName}
+                          onChange={(e) => setEditedWorldName(e.target.value)}
+                          className="h-7 text-sm"
+                          placeholder="World name..."
+                          autoFocus
+                        />
+                        <Button
+                          type="submit"
+                          size="sm"
+                          className="h-7 px-2 text-xs"
+                        >
+                          Save
+                        </Button>
+                      </form>
+                    ) : (
+                      <h3
+                        className="font-serif text-lg font-medium text-glass-text cursor-pointer hover:text-glass-accent"
+                        onClick={() => {
+                          setEditedWorldName(currentWorld.name);
+                          setIsEditingWorldName(true);
+                        }}
+                        title="Click to edit world name"
+                      >
+                        {currentWorld.name}
+                      </h3>
+                    )}
+                  </div>
                   
                   {/* Worldbuilding Stats */}
                   <div className="text-xs space-y-1 mb-4 font-mono">
-                    {Object.entries(worldbuildingHistory).flatMap(([group, categories]) =>
+                    {Object.entries(currentWorld.worldbuilding).flatMap(([group, categories]) =>
                       Object.entries(categories)
                         .filter(([category, entries]) => (entries as string[]).length > 0)
                         .map(([category, entries]) => (
@@ -583,7 +675,7 @@ export function WikiInterface() {
                   {/* Export/Import Buttons */}
                   <div className="space-y-3">
                     <button
-                      onClick={handleExportWorldbuilding}
+                      onClick={handleExportWorld}
                       className="flex items-center text-sm text-glass-sidebar hover:text-glass-text underline underline-offset-2 transition-colors cursor-pointer"
                     >
                       <Download className="mr-2 h-3 w-3" />
@@ -593,13 +685,13 @@ export function WikiInterface() {
                       <input
                         type="file"
                         accept=".json"
-                        onChange={handleImportWorldbuilding}
+                        onChange={handleImportWorld}
                         className="hidden"
-                        id="import-worldbuilding-sidebar"
+                        id="import-world-sidebar"
                         disabled={isLoading}
                       />
                       <label
-                        htmlFor="import-worldbuilding-sidebar"
+                        htmlFor="import-world-sidebar"
                         className="flex items-center text-sm text-glass-sidebar hover:text-glass-text underline underline-offset-2 transition-colors cursor-pointer"
                       >
                         <Upload className="mr-2 h-3 w-3" />
@@ -630,7 +722,7 @@ export function WikiInterface() {
               <WikiPage
                 page={streamingPageData || currentPage}
                 onTermClick={handleTermClick}
-                worldbuildingHistory={worldbuildingHistory}
+                worldbuildingHistory={currentWorld.worldbuilding}
                 sessionId={enableUserApiKeys ? sessionId : undefined}
                 enableUserApiKeys={enableUserApiKeys}
                 isStreaming={isStreaming}

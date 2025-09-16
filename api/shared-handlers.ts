@@ -78,7 +78,7 @@ export async function generateMetadata(
       For categories, choose 2-4 from: ${allCategories.join(', ')}
       For clickableTerms, list 5-8 specific nouns/concepts that would be interesting to explore.
       For relatedConcepts, list 2-4 related topics not directly mentioned.
-      For basicFacts, list 3-4 key facts about the topic.`,
+      For basicFacts, list 3-4 key facts about the topic (e.g., year, location, population, and appropriate attributes like these). Follow the format: name | value`,
       schema: metadataSchema
     });
 
