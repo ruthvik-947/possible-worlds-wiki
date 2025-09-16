@@ -102,7 +102,7 @@ export function ApiKeyDialog({ onApiKeySet, isApiKeyValid, isLoading = false, tr
                className="font-mono text-sm bg-glass-bg/50 border-glass-divider focus:border-glass-accent text-glass-text"
              />
             <p className="text-xs text-glass-sidebar">
-              Your API key is stored temporarily and will be forgotten when you close the browser.
+              Your API key is stored temporarily and will be forgotten when you close or refresh the browser tab.
             </p>
           </div>
 

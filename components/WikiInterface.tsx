@@ -184,11 +184,6 @@ export function WikiInterface() {
 
 
   const handleTermClick = async (term: string, context: string) => {
-    if (enableUserApiKeys && !sessionId) {
-      showApiKeyRequiredToast();
-      return;
-    }
-
     // Clear welcome screen flag since user is navigating to pages
     localStorage.removeItem('pww_on_welcome_screen');
 
@@ -254,8 +249,14 @@ export function WikiInterface() {
         if (error.usageInfo) {
           setCurrentUsageInfo(error.usageInfo);
         }
+        if (enableUserApiKeys) {
+          showApiKeyRequiredToast();
+        }
       } else if (error.code === 'API_KEY_REQUIRED') {
         setErrorMessage(error.message);
+        if (enableUserApiKeys) {
+          showApiKeyRequiredToast();
+        }
       } else {
         setErrorMessage('Failed to generate wiki page. Please try again.');
       }
@@ -293,11 +294,6 @@ export function WikiInterface() {
   };
 
   const generateFirstPageWithSeed = async (seed: string) => {
-    if (enableUserApiKeys && !sessionId) {
-      showApiKeyRequiredToast();
-      return;
-    }
-
     // Clear welcome screen flag since user is now generating content
     localStorage.removeItem('pww_on_welcome_screen');
 
@@ -370,8 +366,14 @@ export function WikiInterface() {
         if (error.usageInfo) {
           setCurrentUsageInfo(error.usageInfo);
         }
+        if (enableUserApiKeys) {
+          showApiKeyRequiredToast();
+        }
       } else if (error.code === 'API_KEY_REQUIRED') {
         setErrorMessage(error.message);
+        if (enableUserApiKeys) {
+          showApiKeyRequiredToast();
+        }
       } else {
         setErrorMessage('Failed to generate wiki page. Please try again.');
       }
@@ -522,7 +524,7 @@ export function WikiInterface() {
                     </div>
                   )}
                   
-                  {!enableUserApiKeys && (
+                  {(!enableUserApiKeys || !sessionId) && (
                     <div className="w-full">
                       <UsageIndicator
                         sessionId={sessionId}
@@ -549,7 +551,7 @@ export function WikiInterface() {
                     )}
                     <Button
                       onClick={handleGenerateFirstPage}
-                      disabled={!seedSentence.trim() || isLoading || (enableUserApiKeys && !sessionId)}
+                      disabled={!seedSentence.trim() || isLoading}
                       className={`${enableUserApiKeys ? 'flex-1' : 'w-full'} bg-glass-text hover:bg-glass-text/90 text-glass-bg font-medium py-3`}
                     >
                       {isLoading ? (
@@ -637,7 +639,7 @@ export function WikiInterface() {
               </div>
 
               <div className="flex-1 p-6 flex flex-col min-h-0">
-                {!enableUserApiKeys && (
+                {(!enableUserApiKeys || !sessionId) && (
                   <div className="mb-4">
                     <UsageIndicator
                       sessionId={sessionId}

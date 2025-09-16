@@ -128,10 +128,6 @@ export function WikiPage({ page, onTermClick, worldbuildingHistory, sessionId, e
 
   const handleAddSection = async () => {
     if (!newSectionTitle.trim()) return;
-    if (enableUserApiKeys && !sessionId) {
-      toast.error('Please set your API key first before generating content.');
-      return;
-    }
 
     setIsGenerating(true);
     try {
@@ -151,8 +147,13 @@ export function WikiPage({ page, onTermClick, worldbuildingHistory, sessionId, e
       if (newSection.usageInfo && onUsageUpdate) {
         onUsageUpdate(newSection.usageInfo);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to generate section:', error);
+      if (error.code === 'RATE_LIMIT_EXCEEDED' || error.code === 'API_KEY_REQUIRED') {
+        toast.error(error.message || 'Please provide your API key to continue generating content.');
+      } else {
+        toast.error('Failed to generate section. Please try again.');
+      }
     } finally {
       setIsGenerating(false);
     }
