@@ -52,6 +52,11 @@ export function incrementUsageForIP(ip: string): number {
 
 // Helper function to check if IP has exceeded free tier limit
 export function hasExceededFreeLimit(ip: string): boolean {
+  // Check if bypass is enabled via environment variable
+  if (process.env.BYPASS_USAGE_LIMITS === 'true') {
+    return false; // Never exceed limit when bypass is enabled
+  }
+
   const usage = getUsageForIP(ip);
   return usage.count >= FREE_TIER_DAILY_LIMIT;
 }

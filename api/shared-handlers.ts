@@ -12,124 +12,76 @@ import {
   FREE_TIER_DAILY_LIMIT
 } from './utils/shared.js';
 
-// Helper functions to extract sections from streamed text
-export function extractSection(text: string, startMarker: string, endMarker: string | null): string | null {
-  // Try exact match first
-  let startIndex = text.indexOf(startMarker);
+// Helper functions to parse JSON-at-the-end format
+export function extractContentAndJSON(text: string): { content: string; jsonData: any | null; isComplete: boolean } {
+  // Look for the last JSON block that starts with { and ends with }
+  // We need to handle cases where there might be partial JSON at the end
+  const lastOpenBrace = text.lastIndexOf('{');
+  const lastCloseBrace = text.lastIndexOf('}');
 
-  // If exact match fails, try case-insensitive search
-  if (startIndex === -1) {
-    const lowerText = text.toLowerCase();
-    const lowerMarker = startMarker.toLowerCase();
-    const lowerStartIndex = lowerText.indexOf(lowerMarker);
-    if (lowerStartIndex !== -1) {
-      startIndex = lowerStartIndex;
+  if (lastOpenBrace !== -1 && lastCloseBrace > lastOpenBrace) {
+    // We have a complete JSON block
+    const jsonStr = text.substring(lastOpenBrace, lastCloseBrace + 1);
+    try {
+      const jsonData = JSON.parse(jsonStr);
+      // Remove the JSON block from the content
+      const content = text.substring(0, lastOpenBrace).trim();
+
+      return {
+        content,
+        jsonData,
+        isComplete: true
+      };
+    } catch (e) {
+      // JSON is malformed, but we can still extract content before it
+      const content = text.substring(0, lastOpenBrace).trim();
+      return {
+        content,
+        jsonData: null,
+        isComplete: false
+      };
     }
+  } else if (lastOpenBrace !== -1 && lastCloseBrace <= lastOpenBrace) {
+    // JSON block started but not complete yet
+    const content = text.substring(0, lastOpenBrace).trim();
+    return {
+      content,
+      jsonData: null,
+      isComplete: false
+    };
   }
 
-  if (startIndex === -1) return null;
+  // No JSON found yet, return all as content
+  return {
+    content: text.trim(),
+    jsonData: null,
+    isComplete: false
+  };
+}
 
-  const contentStart = startIndex + startMarker.length;
-  let content = '';
+export function parseMetadata(jsonData: any): {
+  categories: string[];
+  clickableTerms: string[];
+  relatedConcepts: Array<{term: string; description: string}>;
+  basicFacts: Array<{name: string; value: string}>;
+} {
+  const defaultResult = {
+    categories: [],
+    clickableTerms: [],
+    relatedConcepts: [],
+    basicFacts: []
+  };
 
-  if (endMarker) {
-    let endIndex = text.indexOf(endMarker, contentStart);
-
-    // Try case-insensitive search for end marker
-    if (endIndex === -1) {
-      const lowerText = text.toLowerCase();
-      const lowerEndMarker = endMarker.toLowerCase();
-      endIndex = lowerText.indexOf(lowerEndMarker, contentStart);
-    }
-
-    if (endIndex === -1) {
-      content = text.substring(contentStart);
-    } else {
-      content = text.substring(contentStart, endIndex);
-    }
-  } else {
-    content = text.substring(contentStart);
+  if (!jsonData || typeof jsonData !== 'object') {
+    return defaultResult;
   }
 
-  return content.trim();
-}
-
-export function extractList(text: string, startMarker: string, endMarker: string | null): string[] {
-  const section = extractSection(text, startMarker, endMarker);
-  if (!section) return [];
-
-  return section
-    .split('\n')
-    .map(line => line.trim())
-    .filter(line => {
-      // Filter out empty lines, section headers, and unwanted characters
-      return line.length > 0 &&
-             !line.toLowerCase().includes('categories:') &&
-             !line.toLowerCase().includes('clickable_terms:') &&
-             !line.toLowerCase().includes('related_concepts:') &&
-             !line.toLowerCase().includes('basic_facts:') &&
-             !line.toLowerCase().includes('content:') &&
-             !line.match(/^#+$/) && // Remove lines with only hash characters
-             !line.match(/^[-•*]+$/) && // Remove lines with only list markers
-             line !== '##' && line !== '#' && line !== '---';
-    })
-    .map(line => {
-      // Remove common list prefixes and clean up
-      return line.replace(/^[-•*]\s*/, '').replace(/#+$/, '').trim();
-    })
-    .filter(line => line.length > 0); // Remove any empty lines after processing
-}
-
-export function extractKeyValueList(text: string, startMarker: string, endMarker: string | null): Array<{term?: string; description?: string; name?: string; value?: string}> {
-  const section = extractSection(text, startMarker, endMarker);
-  if (!section) return [];
-
-  const isRelatedConcepts = startMarker.toLowerCase().includes('related');
-
-  return section
-    .split('\n')
-    .map(line => line.trim())
-    .filter(line => {
-      // Filter out empty lines, section headers, and unwanted characters
-      return line.length > 0 &&
-             !line.toLowerCase().includes('categories:') &&
-             !line.toLowerCase().includes('clickable_terms:') &&
-             !line.toLowerCase().includes('related_concepts:') &&
-             !line.toLowerCase().includes('basic_facts:') &&
-             !line.toLowerCase().includes('content:') &&
-             !line.match(/^#+$/) && // Remove lines with only hash characters
-             !line.match(/^[-•*]+$/) && // Remove lines with only list markers
-             line !== '##' && line !== '#' && line !== '---';
-    })
-    .map(line => {
-      // Remove common list prefixes and clean up
-      line = line.replace(/^[-•*]\s*/, '').replace(/#+$/, '').trim();
-
-      // Try different separators: |, :, -
-      let key = '', value = '';
-      if (line.includes('|')) {
-        [key, value] = line.split('|', 2).map(s => s.trim());
-      } else if (line.includes(':')) {
-        [key, value] = line.split(':', 2).map(s => s.trim());
-      } else if (line.includes(' - ')) {
-        [key, value] = line.split(' - ', 2).map(s => s.trim());
-      } else {
-        // If no separator found, treat the whole line as the key/term
-        key = line;
-        value = '';
-      }
-
-      // Clean up key and value
-      key = key.replace(/^[-•*]\s*/, '').trim();
-      value = value.replace(/^[-•*]\s*/, '').trim();
-
-      if (isRelatedConcepts) {
-        return { term: key, description: value };
-      } else {
-        return { name: key, value: value };
-      }
-    })
-    .filter(item => (item.term || item.name) && (item.term || item.name).length > 0);
+  return {
+    categories: Array.isArray(jsonData.categories) ? jsonData.categories : [],
+    clickableTerms: Array.isArray(jsonData.clickableTerms) ? jsonData.clickableTerms : [],
+    relatedConcepts: Array.isArray(jsonData.relatedConcepts) ? jsonData.relatedConcepts : [],
+    basicFacts: Array.isArray(jsonData.basicFacts) ? jsonData.basicFacts : []
+  };
 }
 
 export async function handleGenerate(
@@ -196,35 +148,23 @@ export async function handleGenerate(
     ${context ? `The context for this term is: "${context}"` : ''}
     ${worldbuildingHistory ? `Existing worldbuilding context: "${getWorldbuildingContext(worldbuildingHistory)}"` : ''}
 
-    Generate a wiki page titled "${title}" with the following EXACT structure and format:
+    Write a detailed and engaging encyclopedic article about "${title}". Write 3-4 paragraphs of rich, descriptive content that brings this topic to life. Be matter-of-fact and authoritative, no matter how fantastical the subject. ${worldbuildingHistory ? 'Ensure consistency with the existing worldbuilding context provided.' : ''}
 
-    CONTENT:
-    Write 3-4 paragraphs of detailed and engaging encyclopedic content. Be descriptive and matter-of-fact, no matter how absurd the topic. ${worldbuildingHistory ? 'Ensure consistency with the existing worldbuilding context provided.' : ''}
+    After completing the article, you MUST end with a JSON metadata block. Put the JSON on a new line after your article content:
 
-    CATEGORIES:
-    ${allCategories.slice(0, 8).join('\n')}
-    Pick 2-4 of the above categories that best fit your content. List them one per line, like:
-    Technology
-    Culture
+    {
+      "categories": ["category1", "category2"],
+      "clickableTerms": ["term1", "term2", "term3"],
+      "relatedConcepts": [{"term": "concept1", "description": "description1"}],
+      "basicFacts": [{"name": "fact1", "value": "value1"}]
+    }
 
-    CLICKABLE_TERMS:
-    List 5-8 specific nouns, concepts, or names from your content that would be interesting to explore further. These must be exact phrases from the content. List them one per line, like:
-    Language Scientists
-    Temporal Accordions
-    Time-Writing Harmonies
+    For categories, choose 2-4 from: ${allCategories.join(', ')}
+    For clickableTerms, list 5-8 specific nouns/concepts from your content that would be interesting to explore further.
+    For relatedConcepts, list 2-4 related topics not directly mentioned in the content.
+    For basicFacts, list 3-4 key facts about the topic.
 
-    RELATED_CONCEPTS:
-    List 2-4 related topics not directly in the content. Format: term | description
-    Temporal Mechanics | The study of time manipulation technologies
-    Chrono-archaeologists | Scholars who study artifacts from different time periods
-
-    BASIC_FACTS:
-    List 3-4 basic facts. Format: fact_name | fact_value
-    Year of Discovery | 2157 CE
-    Primary Location | China East
-    Population | 12,000 inhabitants
-
-    IMPORTANT: You must include ALL sections with their exact headers (CONTENT:, CATEGORIES:, CLICKABLE_TERMS:, RELATED_CONCEPTS:, BASIC_FACTS:). Do not end abruptly or use ## symbols. Write naturally, not in JSON format.`
+    CRITICAL: You must complete the entire JSON block including the closing brace }. Do not truncate or leave incomplete. Write the full article text first, then the complete JSON metadata.`
   });
 
   let accumulatedText = '';
@@ -235,24 +175,28 @@ export async function handleGenerate(
     accumulatedText += textDelta;
     console.log('Received textDelta:', textDelta.length, 'chars');
 
-    // Parse sections as they complete
-    const sections = {
-      content: extractSection(accumulatedText, 'CONTENT:', 'CATEGORIES:') || '',
-      categories: extractList(accumulatedText, 'CATEGORIES:', 'CLICKABLE_TERMS:') || [],
-      clickableTerms: extractList(accumulatedText, 'CLICKABLE_TERMS:', 'RELATED_CONCEPTS:') || [],
-      relatedConcepts: extractKeyValueList(accumulatedText, 'RELATED_CONCEPTS:', 'BASIC_FACTS:') || [],
-      basicFacts: extractKeyValueList(accumulatedText, 'BASIC_FACTS:', null) || []
+    // Parse content and JSON as they complete
+    const parseResult = extractContentAndJSON(accumulatedText);
+    const metadata = parseResult.jsonData ? parseMetadata(parseResult.jsonData) : {
+      categories: [],
+      clickableTerms: [],
+      relatedConcepts: [],
+      basicFacts: []
     };
 
-    // Add debug logging for empty sections
+    // Add debug logging for streaming progress
     if (accumulatedText.length > 500) {
       console.log('Current accumulated text length:', accumulatedText.length);
-      console.log('Sections extracted:', {
-        contentLength: sections.content.length,
-        categoriesCount: sections.categories.length,
-        clickableTermsCount: sections.clickableTerms.length,
-        relatedConceptsCount: sections.relatedConcepts.length,
-        basicFactsCount: sections.basicFacts.length
+      console.log('Parse result:', {
+        contentLength: parseResult.content.length,
+        hasJSON: !!parseResult.jsonData,
+        isComplete: parseResult.isComplete,
+        metadataCounts: {
+          categories: metadata.categories.length,
+          clickableTerms: metadata.clickableTerms.length,
+          relatedConcepts: metadata.relatedConcepts.length,
+          basicFacts: metadata.basicFacts.length
+        }
       });
     }
 
@@ -260,50 +204,47 @@ export async function handleGenerate(
     const partialData = {
       id: pageId,
       title,
-      content: sections.content,
-      categories: sections.categories,
-      clickableTerms: sections.clickableTerms,
-      relatedConcepts: sections.relatedConcepts,
-      basicFacts: sections.basicFacts,
-      isPartial: true,
+      content: parseResult.content,
+      categories: metadata.categories,
+      clickableTerms: metadata.clickableTerms,
+      relatedConcepts: metadata.relatedConcepts,
+      basicFacts: metadata.basicFacts,
+      isPartial: !parseResult.isComplete,
+      hasMetadata: !!parseResult.jsonData,
       progress: Math.min(90, Math.floor((accumulatedText.length / 2500) * 100))
     };
 
     if (writeData) {
       writeData('data: ' + JSON.stringify(partialData) + '\n\n');
     }
-    console.log('Sent streaming update, content length:', sections.content.length);
+    console.log('Sent streaming update, content length:', parseResult.content.length);
   }
 
   // Parse final complete response
-  const finalSections = {
-    content: extractSection(accumulatedText, 'CONTENT:', 'CATEGORIES:') || '',
-    categories: extractList(accumulatedText, 'CATEGORIES:', 'CLICKABLE_TERMS:') || [],
-    clickableTerms: extractList(accumulatedText, 'CLICKABLE_TERMS:', 'RELATED_CONCEPTS:') || [],
-    relatedConcepts: extractKeyValueList(accumulatedText, 'RELATED_CONCEPTS:', 'BASIC_FACTS:') || [],
-    basicFacts: extractKeyValueList(accumulatedText, 'BASIC_FACTS:', null) || []
+  const finalParseResult = extractContentAndJSON(accumulatedText);
+  const finalMetadata = finalParseResult.jsonData ? parseMetadata(finalParseResult.jsonData) : {
+    categories: [],
+    clickableTerms: [],
+    relatedConcepts: [],
+    basicFacts: []
   };
 
-  console.log('Final text processing complete. Final sections:', {
-    contentLength: finalSections.content.length,
-    categoriesCount: finalSections.categories.length,
-    clickableTermsCount: finalSections.clickableTerms.length,
-    relatedConceptsCount: finalSections.relatedConcepts.length,
-    basicFactsCount: finalSections.basicFacts.length
+  console.log('Final text processing complete. Parse result:', {
+    contentLength: finalParseResult.content.length,
+    hasJSON: !!finalParseResult.jsonData,
+    isComplete: finalParseResult.isComplete,
+    metadataCounts: {
+      categories: finalMetadata.categories.length,
+      clickableTerms: finalMetadata.clickableTerms.length,
+      relatedConcepts: finalMetadata.relatedConcepts.length,
+      basicFacts: finalMetadata.basicFacts.length
+    }
   });
 
-  // If we have very few extracted items, log the raw text for debugging
-  if (finalSections.categories.length === 0 || finalSections.clickableTerms.length === 0) {
-    console.log('WARNING: Low extraction count. Final accumulated text sample:');
-    console.log(accumulatedText.substring(Math.max(0, accumulatedText.length - 1500)));
-
-    // Debug each section extraction
-    console.log('\n=== DEBUG SECTION EXTRACTION ===');
-    console.log('CATEGORIES section:', extractSection(accumulatedText, 'CATEGORIES:', 'CLICKABLE_TERMS:'));
-    console.log('CLICKABLE_TERMS section:', extractSection(accumulatedText, 'CLICKABLE_TERMS:', 'RELATED_CONCEPTS:'));
-    console.log('RELATED_CONCEPTS section:', extractSection(accumulatedText, 'RELATED_CONCEPTS:', 'BASIC_FACTS:'));
-    console.log('BASIC_FACTS section:', extractSection(accumulatedText, 'BASIC_FACTS:', null));
-    console.log('=== END DEBUG ===\n');
+  // If we don't have complete JSON, log for debugging
+  if (!finalParseResult.isComplete) {
+    console.log('WARNING: JSON not complete. Final accumulated text sample:');
+    console.log(accumulatedText.substring(Math.max(0, accumulatedText.length - 1000)));
   }
 
   // If using free tier (no user API key), increment usage count
@@ -317,9 +258,14 @@ export async function handleGenerate(
   const finalData = {
     id: pageId,
     title,
-    ...finalSections,
+    content: finalParseResult.content,
+    categories: finalMetadata.categories,
+    clickableTerms: finalMetadata.clickableTerms,
+    relatedConcepts: finalMetadata.relatedConcepts,
+    basicFacts: finalMetadata.basicFacts,
     isPartial: false,
     isComplete: true,
+    hasMetadata: !!finalParseResult.jsonData,
     usageInfo: hasUserApiKey ? null : {
       usageCount: currentUsage.count,
       dailyLimit: FREE_TIER_DAILY_LIMIT,
