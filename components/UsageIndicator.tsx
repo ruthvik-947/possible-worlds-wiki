@@ -16,9 +16,10 @@ interface UsageInfo {
 interface UsageIndicatorProps {
   onUpgradeRequested?: () => void;
   usageInfo?: UsageInfo | null;
+  hasUserApiKey?: boolean;
 }
 
-export function UsageIndicator({ onUpgradeRequested, usageInfo: propUsageInfo }: UsageIndicatorProps) {
+export function UsageIndicator({ onUpgradeRequested, usageInfo: propUsageInfo, hasUserApiKey }: UsageIndicatorProps) {
   const [usageInfo, setUsageInfo] = useState<UsageInfo | null>(propUsageInfo || null);
   const [isLoading, setIsLoading] = useState(!propUsageInfo);
   const { isLoaded, isSignedIn, getToken } = useAuth();
@@ -60,14 +61,15 @@ export function UsageIndicator({ onUpgradeRequested, usageInfo: propUsageInfo }:
     }
   }, [propUsageInfo, fetchUsage]);
 
-  // Always show the usage indicator if there's no API key set,
-  // even if usage is 0
-  if (isLoading || !usageInfo) {
-    return null;
-  }
+  // Also fetch usage when we know there's no API key but don't have usage data
+  useEffect(() => {
+    if (hasUserApiKey === false && !usageInfo && !isLoading) {
+      fetchUsage();
+    }
+  }, [hasUserApiKey, usageInfo, isLoading, fetchUsage]);
 
-  // Show unlimited indicator when user has API key set
-  if (usageInfo.hasUserApiKey || usageInfo.unlimited) {
+  // If we know there's an API key set, show unlimited indicator
+  if (hasUserApiKey || (usageInfo && (usageInfo.hasUserApiKey || usageInfo.unlimited))) {
     return (
       <Card className="glass-panel border-glass-divider">
         <CardContent className="p-3">
@@ -81,6 +83,89 @@ export function UsageIndicator({ onUpgradeRequested, usageInfo: propUsageInfo }:
     );
   }
 
+  // If we know there's no API key, always show usage bar
+  if (hasUserApiKey === false) {
+    // If we don't have usage data yet, show loading state
+    if (!usageInfo) {
+      return (
+        <Card className="glass-panel border-glass-divider">
+          <CardContent className="p-3 space-y-2">
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-glass-text font-medium">
+                Free Generations Today
+              </span>
+              <button
+                onClick={onUpgradeRequested}
+                className="p-1 text-glass-sidebar hover:text-glass-accent transition-colors"
+                title="Set API Key"
+              >
+                <Key className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="text-xs text-glass-sidebar">Loading usage info...</div>
+          </CardContent>
+        </Card>
+      );
+    }
+
+    // Use actual usage data
+    const percentage = (usageInfo.usageCount / usageInfo.dailyLimit) * 100;
+    const isNearLimit = percentage >= 80;
+    const isAtLimit = usageInfo.remaining <= 0;
+
+    return (
+      <Card className={`glass-panel border-glass-divider relative ${isAtLimit ? 'border-red-500' : isNearLimit ? 'border-orange-500' : ''}`}>
+        <CardContent className="p-3 space-y-2">
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-glass-text font-medium">
+              Free Generations Today
+            </span>
+            <button
+              onClick={onUpgradeRequested}
+              className="p-1 text-glass-sidebar hover:text-glass-accent transition-colors"
+              title="Set API Key"
+            >
+              <Key className="h-4 w-4" />
+            </button>
+          </div>
+
+          <Progress
+            value={percentage}
+            className={`h-2 ${isAtLimit ? 'text-red-500' : isNearLimit ? 'text-orange-500' : 'text-blue-500'}`}
+          />
+
+          <div className="flex items-center justify-between text-xs">
+            <span className={`${isAtLimit ? 'text-red-600' : 'text-glass-sidebar'}`}>
+              {usageInfo.usageCount} / {usageInfo.dailyLimit} used
+            </span>
+            {isAtLimit ? (
+              <div className="flex items-center gap-1 text-red-600">
+                <AlertTriangle className="h-3 w-3" />
+                <span>Limit reached</span>
+              </div>
+            ) : (
+              <span className="text-glass-sidebar">
+                {usageInfo.remaining} remaining
+              </span>
+            )}
+          </div>
+
+          {isNearLimit && !isAtLimit && (
+            <div className="text-xs text-orange-600 mt-1">
+              Add your API key for unlimited usage
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    );
+  }
+
+  // If we don't know API key status and don't have usage data, return null (still loading)
+  if (!usageInfo) {
+    return null;
+  }
+
+  // This should not happen, but fallback for when usageInfo exists but hasUserApiKey is undefined
   const percentage = (usageInfo.usageCount / usageInfo.dailyLimit) * 100;
   const isNearLimit = percentage >= 80;
   const isAtLimit = usageInfo.remaining <= 0;

@@ -11,6 +11,8 @@ dotenv.config();
 // Import these AFTER loading environment variables
 import { handleGenerate, handleGenerateSection, handleImageGeneration } from './shared-handlers.js';
 import { storeApiKey, getApiKey, removeApiKey, hasApiKey } from './utils/apiKeyStorage.js';
+import { getFreeLimit } from './utils/shared.js';
+import { getUsageForUser } from './utils/quota.js';
 
 // API key cleanup is now handled in apiKeyStorage.ts with Redis TTL
 
@@ -35,6 +37,42 @@ app.get('/api/config', ClerkExpressRequireAuth(), (req: any, res: any) => {
   res.json({
     enableUserApiKeys: process.env.ENABLE_USER_API_KEYS === 'true'
   });
+});
+
+// Usage endpoint - get current usage for user
+app.get('/api/usage', ClerkExpressRequireAuth(), async (req: any, res: any) => {
+  const userId = req.auth?.userId;
+  if (!userId) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  try {
+    // Check if user has API key
+    const hasUserApiKey = await hasApiKey(userId);
+
+    if (hasUserApiKey) {
+      res.json({
+        hasUserApiKey: true,
+        usageCount: 0,
+        dailyLimit: 0,
+        remaining: 0,
+        unlimited: true
+      });
+    } else {
+      const usage = await getUsageForUser(userId);
+      const dailyLimit = getFreeLimit();
+      res.json({
+        hasUserApiKey: false,
+        usageCount: usage.count,
+        dailyLimit,
+        remaining: Math.max(0, dailyLimit - usage.count),
+        unlimited: false
+      });
+    }
+  } catch (error) {
+    console.error('Failed to get usage:', error);
+    res.status(500).json({ error: 'Failed to get usage information' });
+  }
 });
 
 // API key storage endpoint (no validation for now)

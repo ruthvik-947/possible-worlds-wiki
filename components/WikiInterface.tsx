@@ -201,6 +201,7 @@ export function WikiInterface() {
   const handleApiKeyStored = () => {
     setHasUserApiKey(true);
     setCurrentUsageInfo(null);
+    setErrorMessage(null); // Clear any error messages
     toast.success('API key saved for this session');
   };
 
@@ -661,6 +662,7 @@ export function WikiInterface() {
                     <div className="w-full">
                       <UsageIndicator
                         usageInfo={currentUsageInfo}
+                        hasUserApiKey={hasUserApiKey}
                         onUpgradeRequested={handleUpgradeRequested}
                       />
                     </div>
@@ -677,11 +679,6 @@ export function WikiInterface() {
                           open={isApiDialogOpen}
                           onOpenChange={setIsApiDialogOpen}
                         />
-                        {!hasUserApiKey && (
-                          <div className="text-xs text-glass-sidebar mt-1 text-center">
-                            5 free generations with PWW-keys per day
-                          </div>
-                        )}
                       </div>
                     )}
                     <Button
@@ -738,6 +735,7 @@ export function WikiInterface() {
                   <div className="mb-4">
                     <UsageIndicator
                       usageInfo={currentUsageInfo}
+                      hasUserApiKey={hasUserApiKey}
                       onUpgradeRequested={handleUpgradeRequested}
                     />
                   </div>
