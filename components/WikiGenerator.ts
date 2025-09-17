@@ -11,6 +11,7 @@ export interface WikiPageData {
   basicFacts: { name: string; value: string }[];
   sections?: { title: string; content: string }[];
   imageUrl?: string | null;
+  createdAt?: number;
   usageInfo?: {
     usageCount: number;
     dailyLimit: number;

@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '@clerk/clerk-react';
 import { Button } from './ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
-import { FolderOpen, Trash2, FileText, AlertCircle, Upload, RefreshCw } from 'lucide-react';
+import { FolderOpen, Trash2, FileText, AlertCircle, Upload, RefreshCw, Globe, Speaker } from 'lucide-react';
 import { World } from './WorldModel';
 import { toast } from 'sonner';
 import {
@@ -247,17 +247,15 @@ export function WorldManager({
   if (variant === 'welcome') {
     return (
       <div className="space-y-3">
-
         <div>
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger asChild>
               <Button
                 variant="ghost"
                 size="sm"
-                className="w-full justify-start text-glass-sidebar hover:text-glass-text hover:bg-glass-divider/30"
-              >
+                className="w-full justify-start text-glass-sidebar hover:text-glass-text hover:bg-glass-divider/30">
                 <FolderOpen className="mr-2 h-3 w-3" />
-                Worlds
+                Saved Worlds
               </Button>
             </DialogTrigger>
             <DialogContent className="sm:max-w-lg glass-panel border-glass-divider !bg-glass-bg">
@@ -270,6 +268,26 @@ export function WorldManager({
               {managerContent}
             </DialogContent>
           </Dialog>
+        </div>
+        <div>
+          <Button
+            variant="ghost"
+            size="sm"
+            disabled
+            className="w-full justify-start text-glass-sidebar opacity-50 cursor-not-allowed">
+            <Globe className="mr-2 h-3 w-3" />
+            Community Generated Worlds (Soon)
+          </Button>
+        </div>
+        <div>
+          <Button
+            variant="ghost"
+            size="sm"
+            disabled
+            className="w-full justify-start text-glass-sidebar opacity-50 cursor-not-allowed">
+            <Speaker className="mr-2 h-3 w-3" />
+            Customise Worldbuilding (Soon)
+          </Button>
         </div>
       </div>
     );

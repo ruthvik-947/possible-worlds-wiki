@@ -3,7 +3,7 @@ import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
-import { Loader, Upload, Menu, Sun, Moon, Settings, LogOut, Search } from 'lucide-react';
+import { Loader, Upload, Menu, Sun, Moon, Settings, LogOut, Search, Share } from 'lucide-react';
 import { WikiPage } from './WikiPage';
 import { generateWikiPage, WikiPageData } from './WikiGenerator';
 import { ApiKeyDialog } from './ApiKeyDialog';
@@ -417,6 +417,9 @@ export function WikiInterface() {
         authToken
       );
 
+      // Add creation timestamp
+      newPage.createdAt = Date.now();
+
       // Update usage info from response
       if (newPage.usageInfo) {
         setCurrentUsageInfo(newPage.usageInfo);
@@ -536,6 +539,9 @@ export function WikiInterface() {
         },
         authToken
       );
+
+      // Add creation timestamp
+      firstPage.createdAt = Date.now();
 
       // Update usage info from response
       if (firstPage.usageInfo) {
@@ -932,7 +938,7 @@ export function WikiInterface() {
                         >
                           {currentWorld.name}
                         </h3>
-                        <div className="flex items-center">
+                        <div className="flex items-center gap-1">
                           <WorldManager
                             currentWorld={currentWorld}
                             onLoadWorld={handleLoadWorld}
@@ -940,6 +946,16 @@ export function WikiInterface() {
                             onImportWorld={handleImportWorld}
                             autoSaveInfo={autoSaveInfo}
                           />
+                          <div title="Publish World (Coming Soon)">
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              disabled
+                              className="text-glass-sidebar opacity-50 cursor-not-allowed"
+                            >
+                              <Share className="h-3 w-3" />
+                            </Button>
+                          </div>
                         </div>
                       </>
                     )}

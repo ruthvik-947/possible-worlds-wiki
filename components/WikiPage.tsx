@@ -444,11 +444,6 @@ export function WikiPage({ page, onTermClick, worldbuildingHistory, enableUserAp
             </p>
           </div>
 
-          {/* Last Edit Info */}
-          <div className="mt-8 text-glass-sidebar text-sm font-mono flex items-center">
-            <Clock className="h-4 w-4 mr-2" />
-            Last edited 3 days ago
-          </div>
         </div>
       </main>
 
