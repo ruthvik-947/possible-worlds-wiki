@@ -168,6 +168,13 @@ export function WorldManager({ currentWorld, pages, pageImages, onLoadWorld, onN
             </DialogHeader>
 
             <div className="space-y-4">
+              {/* Local Storage Notice */}
+              <div className="text-xs text-glass-sidebar bg-glass-divider/20 border border-glass-divider rounded p-2">
+                <AlertCircle className="h-3 w-3 inline mr-1" />
+                Worlds are stored locally in your browser and will persist until you clear browser data.
+                Data typically remains for months unless manually cleared. Not synced across devices.
+              </div>
+
               {/* Storage Stats */}
               <div className="text-xs text-glass-sidebar space-y-1">
                 <div className="flex justify-between">
@@ -343,6 +350,13 @@ export function WorldManager({ currentWorld, pages, pageImages, onLoadWorld, onN
           </DialogHeader>
 
           <div className="space-y-4">
+            {/* Local Storage Notice */}
+            <div className="text-xs text-glass-sidebar bg-glass-divider/20 border border-glass-divider rounded p-2">
+              <AlertCircle className="h-3 w-3 inline mr-1" />
+              Worlds are stored locally in your browser and will persist until you clear browser data.
+              Data typically remains for months unless manually cleared. Not synced across devices.
+            </div>
+
             {/* Storage Stats */}
             <div className="text-xs text-glass-sidebar space-y-1">
               <div className="flex justify-between">

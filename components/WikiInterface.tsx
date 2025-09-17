@@ -3,7 +3,7 @@ import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
-import { ArrowLeft, Home, Search, Loader, Upload, Menu, Sun, Moon, Settings } from 'lucide-react';
+import { ArrowLeft, Home, Search, Loader, Upload, Menu, Sun, Moon, Settings, LogOut } from 'lucide-react';
 import { WikiPage } from './WikiPage';
 import { generateWikiPage, WikiPageData } from './WikiGenerator';
 import { ApiKeyDialog } from './ApiKeyDialog';
@@ -23,7 +23,7 @@ import { config } from '../lib/config';
 import { worldPersistence } from '../lib/worldPersistence';
 import { WorldManager } from './WorldManager';
 import { Toaster, toast } from 'sonner';
-import { useAuth } from '@clerk/clerk-react';
+import { useAuth, SignOutButton } from '@clerk/clerk-react';
 
 export function WikiInterface() {
   const [pages, setPages] = useState<Map<string, WikiPageData>>(new Map());
@@ -604,6 +604,16 @@ export function WikiInterface() {
                 }
               />
             )}
+            <SignOutButton signOutOptions={{ redirectUrl: '/' }}>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-glass-bg hover:bg-glass-bg/10 h-8 w-8 p-0"
+                title="Sign out"
+              >
+                <LogOut className="h-4 w-4" />
+              </Button>
+            </SignOutButton>
           </div>
         </div>
       </nav>
