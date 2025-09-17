@@ -1,18 +1,23 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '@clerk/clerk-react';
 import { Button } from './ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
 import { Badge } from './ui/badge';
-import { Save, FolderOpen, Trash2, FileText, AlertCircle, Download, Upload, RefreshCw } from 'lucide-react';
-import { World, exportWorld, updateWorldMetadata } from './WorldModel';
+import { FolderOpen, Trash2, FileText, AlertCircle, Download, Upload, RefreshCw } from 'lucide-react';
+import { World, exportWorld } from './WorldModel';
 import { toast } from 'sonner';
 import {
   fetchWorldSummaries,
   fetchWorldById,
-  saveWorldToServer,
   deleteWorldFromServer,
   RemoteWorldSummary
 } from '../lib/worldService';
+
+export interface AutoSaveInfo {
+  status: 'idle' | 'saving' | 'saved' | 'error';
+  timestamp?: number;
+  error?: string;
+}
 
 interface WorldManagerProps {
   currentWorld: World;
@@ -21,6 +26,7 @@ interface WorldManagerProps {
   onImportWorld?: (event: React.ChangeEvent<HTMLInputElement>) => void;
   isLoading?: boolean;
   variant?: 'inline' | 'welcome';
+  autoSaveInfo?: AutoSaveInfo;
 }
 
 const formatDate = (timestamp: number) => {
@@ -34,18 +40,29 @@ const formatDate = (timestamp: number) => {
   return date.toLocaleDateString();
 };
 
+const formatRelativeTime = (timestamp: number) => {
+  const diffMs = Date.now() - timestamp;
+  if (diffMs < 5000) return 'just now';
+  if (diffMs < 60000) return `${Math.max(1, Math.round(diffMs / 1000))}s ago`;
+  if (diffMs < 3600000) return `${Math.round(diffMs / 60000)}m ago`;
+  if (diffMs < 86400000) return `${Math.round(diffMs / 3600000)}h ago`;
+  return formatDate(timestamp);
+};
+
 export function WorldManager({
   currentWorld,
   onLoadWorld,
   onNewWorld,
   onImportWorld,
   isLoading: parentLoading = false,
-  variant = 'inline'
+  variant = 'inline',
+  autoSaveInfo
 }: WorldManagerProps) {
   const [savedWorlds, setSavedWorlds] = useState<RemoteWorldSummary[]>([]);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isWorking, setIsWorking] = useState(false);
   const { isLoaded: isAuthLoaded, isSignedIn, getToken } = useAuth();
+  const lastAutoSaveError = useRef<string | null>(null);
 
   const requireAuthToken = useCallback(async () => {
     const token = await getToken({ skipCache: true });
@@ -78,32 +95,22 @@ export function WorldManager({
     refreshWorldsList();
   }, [refreshWorldsList]);
 
-  const handleSaveWorld = async () => {
-    const pageCount = Object.keys(currentWorld.pages || {}).length;
-    if (pageCount === 0) {
-      toast.error('No pages to save yet. Generate or add a page first.');
-      return;
+  useEffect(() => {
+    if (autoSaveInfo?.status === 'saved' && autoSaveInfo.timestamp) {
+      refreshWorldsList();
     }
+  }, [autoSaveInfo?.status, autoSaveInfo?.timestamp, refreshWorldsList]);
 
-    setIsWorking(true);
-    try {
-      const token = await requireAuthToken();
-      const updatedWorld = updateWorldMetadata({
-        ...currentWorld,
-        lastModified: Date.now()
-      });
-
-      await saveWorldToServer(token, updatedWorld);
-      toast.success(`World "${updatedWorld.name}" saved to your account`);
-      onLoadWorld(updatedWorld);
-      await refreshWorldsList();
-    } catch (error: any) {
-      console.error('Failed to save world:', error);
-      toast.error(error?.message || 'Failed to save world.');
-    } finally {
-      setIsWorking(false);
+  useEffect(() => {
+    if (autoSaveInfo?.status === 'error' && autoSaveInfo.error) {
+      if (autoSaveInfo.error !== lastAutoSaveError.current) {
+        lastAutoSaveError.current = autoSaveInfo.error;
+        toast.error(autoSaveInfo.error);
+      }
+    } else {
+      lastAutoSaveError.current = null;
     }
-  };
+  }, [autoSaveInfo?.status, autoSaveInfo?.error]);
 
   const handleLoadWorld = async (worldId: string) => {
     setIsWorking(true);
@@ -170,6 +177,27 @@ export function WorldManager({
 
   const totalPages = Object.keys(currentWorld.pages || {}).length;
   const effectiveLoading = parentLoading || isWorking;
+  const autoSaveStatus = autoSaveInfo?.status ?? 'idle';
+  const autoSaveMessage = (() => {
+    if (totalPages === 0) {
+      return 'Auto-save activates once you add pages to this world.';
+    }
+    switch (autoSaveStatus) {
+      case 'saving':
+        return 'Saving changes…';
+      case 'saved':
+        return autoSaveInfo?.timestamp ? `Saved ${formatRelativeTime(autoSaveInfo.timestamp)}` : 'Saved.';
+      case 'error':
+        return 'Auto-save failed. We will retry shortly.';
+      default:
+        return 'Auto-save ready.';
+    }
+  })();
+  const autoSaveClass = autoSaveStatus === 'error'
+    ? 'text-red-400'
+    : autoSaveStatus === 'saving'
+      ? 'text-glass-text'
+      : 'text-glass-sidebar';
 
   const renderWorldsList = () => (
     <div className="space-y-3">
@@ -230,8 +258,34 @@ export function WorldManager({
 
   const managerContent = (
     <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <div className="text-xs text-glass-sidebar bg-glass-divider/20 border border-glass-divider rounded px-2 py-1">
+          <AlertCircle className="h-3 w-3 inline mr-1" />
+          Worlds are stored securely on the server and scoped to your account.
+        </div>
+        <Button
+          size="icon"
+          variant="ghost"
+          className="h-7 w-7 text-glass-sidebar hover:text-glass-text"
+          onClick={refreshWorldsList}
+          disabled={effectiveLoading}
+        >
+          <RefreshCw className="h-4 w-4" />
+        </Button>
+      </div>
 
-      {/* <Button
+      <div className={`text-xs ${autoSaveClass}`}>
+        {autoSaveMessage}
+      </div>
+
+      <div className="text-xs text-glass-sidebar space-y-1">
+        <div className="flex justify-between">
+          <span>Saved worlds:</span>
+          <span>{savedWorlds.length}</span>
+        </div>
+      </div>
+
+      <Button
         onClick={handleNewWorld}
         variant="outline"
         className="w-full justify-start border-glass-divider"
@@ -239,9 +293,9 @@ export function WorldManager({
       >
         <FileText className="mr-2 h-4 w-4" />
         Start New World
-      </Button> */}
+      </Button>
 
-      {/* {onImportWorld && (
+      {onImportWorld && (
         <div>
           <input
             type="file"
@@ -259,24 +313,10 @@ export function WorldManager({
             Import world
           </label>
         </div>
-      )} */}
+      )}
 
       <div className="space-y-2">
-        
-        
-        <div className="flex items-center justify-between">
-          <div className="text-xs uppercase text-glass-sidebar tracking-wide">Saved Worlds</div>
-          <Button
-            size="icon"
-            variant="ghost"
-            className="h-7 w-7 text-glass-sidebar hover:text-glass-text"
-            onClick={refreshWorldsList}
-            disabled={effectiveLoading}
-          >
-            <RefreshCw className="h-4 w-4" />
-          </Button>
-        </div>
-
+        <div className="text-xs uppercase text-glass-sidebar tracking-wide">Saved Worlds</div>
         {renderWorldsList()}
       </div>
     </div>
@@ -285,20 +325,9 @@ export function WorldManager({
   if (variant === 'welcome') {
     return (
       <div className="space-y-3">
-        {totalPages > 0 && (
-          <div>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="w-full justify-start text-glass-sidebar hover:text-glass-text hover:bg-glass-divider/30"
-              onClick={handleSaveWorld}
-              disabled={effectiveLoading}
-            >
-              <Save className="mr-2 h-3 w-3" />
-              {effectiveLoading ? 'Saving world...' : 'Save world'}
-            </Button>
-          </div>
-        )}
+        <div className={`text-xs ${autoSaveClass} bg-glass-divider/20 border border-glass-divider rounded px-2 py-1`}>
+          {autoSaveMessage}
+        </div>
 
         <div>
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
@@ -336,17 +365,7 @@ export function WorldManager({
             </Badge>
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={handleSaveWorld}
-            disabled={effectiveLoading || totalPages === 0}
-            className="border-glass-divider"
-          >
-            <Save className="mr-2 h-3 w-3" />
-            {effectiveLoading ? 'Saving...' : 'Save world'}
-          </Button>
+        <div className="flex items-center gap-3">
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger asChild>
               <Button size="sm" variant="ghost" className="text-glass-sidebar hover:text-glass-text">
@@ -361,12 +380,19 @@ export function WorldManager({
               {managerContent}
             </DialogContent>
           </Dialog>
+          <span className={`text-xs ${autoSaveClass}`}>{autoSaveMessage}</span>
         </div>
       </div>
 
       <div className="space-y-3">
         <div className="text-xs text-glass-sidebar">
-          Last saved: {currentWorld.lastModified ? formatDate(currentWorld.lastModified) : 'never'}
+          Last saved: {
+            autoSaveInfo?.timestamp
+              ? formatDate(autoSaveInfo.timestamp)
+              : currentWorld.lastModified
+                ? formatDate(currentWorld.lastModified)
+                : 'never'
+          }
         </div>
       </div>
     </div>

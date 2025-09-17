@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
@@ -21,7 +21,8 @@ import {
   getWorldStats
 } from './WorldModel';
 import { config } from '../lib/config';
-import { WorldManager } from './WorldManager';
+import { WorldManager, AutoSaveInfo } from './WorldManager';
+import { saveWorldToServer } from '../lib/worldService';
 import { Toaster, toast } from 'sonner';
 import { useAuth, SignOutButton } from '@clerk/clerk-react';
 
@@ -46,7 +47,11 @@ export function WikiInterface() {
   const [isStreaming, setIsStreaming] = useState<boolean>(false);
   const [isApiDialogOpen, setIsApiDialogOpen] = useState<boolean>(false);
   const [isHomeConfirmOpen, setIsHomeConfirmOpen] = useState<boolean>(false);
+  const [autoSaveInfo, setAutoSaveInfo] = useState<AutoSaveInfo>({ status: 'idle' });
   const { isLoaded: isAuthLoaded, isSignedIn, getToken } = useAuth();
+  const autoSaveTimeoutRef = useRef<number | null>(null);
+  const latestWorldRef = useRef<World>(currentWorld);
+  const lastSerializedRef = useRef<string>('');
 
   useEffect(() => {
     setCurrentWorld(prev => ({
@@ -56,6 +61,15 @@ export function WikiInterface() {
       pageHistory
     }));
   }, [pages, currentPageId, pageHistory]);
+
+  useEffect(() => {
+    latestWorldRef.current = {
+      ...currentWorld,
+      pages: Object.fromEntries(pages),
+      currentPageId,
+      pageHistory
+    };
+  }, [currentWorld, pages, currentPageId, pageHistory]);
 
   // Helper function to show API key required toast with link to open dialog
   const showApiKeyRequiredToast = () => {
@@ -79,6 +93,103 @@ export function WikiInterface() {
     }
     return token;
   }, [getToken]);
+
+  const performAutoSave = useCallback(async () => {
+    if (!isAuthLoaded || !isSignedIn) {
+      return;
+    }
+
+    if (autoSaveTimeoutRef.current !== null) {
+      window.clearTimeout(autoSaveTimeoutRef.current);
+      autoSaveTimeoutRef.current = null;
+    }
+
+    const snapshot = latestWorldRef.current;
+    const pageCount = Object.keys(snapshot.pages || {}).length;
+    if (pageCount === 0) {
+      return;
+    }
+
+    try {
+      setAutoSaveInfo(prev => ({ status: 'saving', timestamp: prev.timestamp }));
+      const token = await requireAuthToken();
+
+      const worldToSave = updateWorldMetadata({
+        ...snapshot,
+        lastModified: Date.now()
+      });
+
+      latestWorldRef.current = worldToSave;
+      setCurrentWorld(worldToSave);
+      const serialized = JSON.stringify(worldToSave);
+      lastSerializedRef.current = serialized;
+
+      await saveWorldToServer(token, worldToSave);
+      setAutoSaveInfo({ status: 'saved', timestamp: Date.now() });
+    } catch (error: any) {
+      console.error('Auto-save failed:', error);
+      const message = error?.message || 'Auto-save failed';
+      setAutoSaveInfo({ status: 'error', error: message });
+    }
+  }, [isAuthLoaded, isSignedIn, requireAuthToken]);
+
+  useEffect(() => {
+    if (!isAuthLoaded || !isSignedIn) {
+      if (autoSaveTimeoutRef.current !== null) {
+        window.clearTimeout(autoSaveTimeoutRef.current);
+        autoSaveTimeoutRef.current = null;
+      }
+      return;
+    }
+
+    const snapshot = {
+      ...currentWorld,
+      pages: Object.fromEntries(pages),
+      currentPageId,
+      pageHistory
+    };
+
+    latestWorldRef.current = snapshot;
+    const serialized = JSON.stringify(snapshot);
+
+    const pageCount = Object.keys(snapshot.pages || {}).length;
+    if (pageCount === 0) {
+      if (autoSaveInfo.status !== 'idle') {
+        setAutoSaveInfo({ status: 'idle' });
+      }
+      lastSerializedRef.current = serialized;
+      if (autoSaveTimeoutRef.current !== null) {
+        window.clearTimeout(autoSaveTimeoutRef.current);
+        autoSaveTimeoutRef.current = null;
+      }
+      return;
+    }
+
+    const shouldSchedule =
+      serialized !== lastSerializedRef.current || autoSaveInfo.status === 'error';
+
+    if (!shouldSchedule) {
+      return;
+    }
+
+    lastSerializedRef.current = serialized;
+
+    if (autoSaveTimeoutRef.current !== null) {
+      window.clearTimeout(autoSaveTimeoutRef.current);
+    }
+
+    autoSaveTimeoutRef.current = window.setTimeout(() => {
+      autoSaveTimeoutRef.current = null;
+      void performAutoSave();
+    }, 3000);
+
+    return () => {
+      if (autoSaveTimeoutRef.current !== null) {
+        window.clearTimeout(autoSaveTimeoutRef.current);
+        autoSaveTimeoutRef.current = null;
+      }
+    };
+  }, [pages, currentWorld, currentPageId, pageHistory, isAuthLoaded, isSignedIn, performAutoSave, autoSaveInfo.status]);
 
   // Check configuration once auth is available
   useEffect(() => {
@@ -196,17 +307,37 @@ export function WikiInterface() {
 
   const handleLoadWorld = (loadedWorld: World) => {
     const loadedPages = new Map<string, WikiPageData>(Object.entries(loadedWorld.pages || {}));
+    latestWorldRef.current = loadedWorld;
+    lastSerializedRef.current = JSON.stringify(loadedWorld);
+    if (autoSaveTimeoutRef.current !== null) {
+      window.clearTimeout(autoSaveTimeoutRef.current);
+      autoSaveTimeoutRef.current = null;
+    }
     setPages(loadedPages);
     setCurrentWorld(loadedWorld);
     setCurrentPageId(loadedWorld.currentPageId || null);
     setPageHistory(loadedWorld.pageHistory || []);
+    const loadedPageCount = Object.keys(loadedWorld.pages || {}).length;
+    if (loadedPageCount > 0) {
+      setAutoSaveInfo({ status: 'saved', timestamp: loadedWorld.lastModified || Date.now() });
+    } else {
+      setAutoSaveInfo({ status: 'idle' });
+    }
   };
 
   const handleNewWorld = () => {
+    const freshWorld = createNewWorld();
+    if (autoSaveTimeoutRef.current !== null) {
+      window.clearTimeout(autoSaveTimeoutRef.current);
+      autoSaveTimeoutRef.current = null;
+    }
+    latestWorldRef.current = freshWorld;
+    lastSerializedRef.current = JSON.stringify(freshWorld);
+    setAutoSaveInfo({ status: 'idle' });
     setPages(new Map());
     setCurrentPageId(null);
     setPageHistory([]);
-    setCurrentWorld(createNewWorld());
+    setCurrentWorld(freshWorld);
     setSeedSentence('');
   };
 
@@ -221,12 +352,23 @@ export function WikiInterface() {
     importWorld(file)
       .then((importedWorld) => {
         const importedPages = new Map<string, WikiPageData>(Object.entries(importedWorld.pages || {}));
+        if (autoSaveTimeoutRef.current !== null) {
+          window.clearTimeout(autoSaveTimeoutRef.current);
+          autoSaveTimeoutRef.current = null;
+        }
+        latestWorldRef.current = importedWorld;
+        lastSerializedRef.current = JSON.stringify(importedWorld);
         setCurrentWorld(importedWorld);
         setPages(importedPages);
         const fallbackPageId = importedPages.size > 0 ? importedPages.keys().next().value : null;
         setCurrentPageId(importedWorld.currentPageId ?? fallbackPageId ?? null);
         setPageHistory(importedWorld.pageHistory || []);
         setSeedSentence('');
+        if (importedPages.size > 0) {
+          setAutoSaveInfo({ status: 'saved', timestamp: importedWorld.lastModified || Date.now() });
+        } else {
+          setAutoSaveInfo({ status: 'idle' });
+        }
         // Use toast for success
         toast.success(`World "${importedWorld.name}" imported successfully!`);
       })
@@ -344,17 +486,19 @@ export function WikiInterface() {
   };
 
   const handleHome = () => {
-    // Clear everything to start fresh
-    setCurrentPageId(null);
-    setPageHistory([]);
-    setPages(new Map());
-    setCurrentWorld(createNewWorld());
-    setSeedSentence('');
+    handleNewWorld();
   };
 
   const generateFirstPageWithSeed = async (seed: string) => {
     // Always start fresh - clear existing world state
     const newWorld = createNewWorld();
+    if (autoSaveTimeoutRef.current !== null) {
+      window.clearTimeout(autoSaveTimeoutRef.current);
+      autoSaveTimeoutRef.current = null;
+    }
+    latestWorldRef.current = newWorld;
+    lastSerializedRef.current = JSON.stringify(newWorld);
+    setAutoSaveInfo({ status: 'idle' });
     setCurrentWorld(newWorld);
     setPages(new Map());
     setCurrentPageId(null);
@@ -655,6 +799,7 @@ export function WikiInterface() {
                       onImportWorld={handleImportWorld}
                       isLoading={isLoading}
                       variant="welcome"
+                      autoSaveInfo={autoSaveInfo}
                     />
                   </div>
                 </CardContent>
@@ -773,6 +918,7 @@ export function WikiInterface() {
                           onLoadWorld={handleLoadWorld}
                           onNewWorld={handleNewWorld}
                           onImportWorld={handleImportWorld}
+                          autoSaveInfo={autoSaveInfo}
                         />
                       </>
                     )}
