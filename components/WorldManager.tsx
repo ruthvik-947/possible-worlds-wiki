@@ -2,9 +2,8 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '@clerk/clerk-react';
 import { Button } from './ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
-import { Badge } from './ui/badge';
-import { FolderOpen, Trash2, FileText, AlertCircle, Download, Upload, RefreshCw } from 'lucide-react';
-import { World, exportWorld } from './WorldModel';
+import { FolderOpen, Trash2, FileText, AlertCircle, Upload, RefreshCw } from 'lucide-react';
+import { World } from './WorldModel';
 import { toast } from 'sonner';
 import {
   fetchWorldSummaries,
@@ -128,20 +127,6 @@ export function WorldManager({
     }
   };
 
-  const handleExportWorld = async (worldId: string, worldName: string) => {
-    setIsWorking(true);
-    try {
-      const token = await requireAuthToken();
-      const record = await fetchWorldById(token, worldId);
-      exportWorld(record.world);
-      toast.success(`World "${worldName}" exported`);
-    } catch (error: any) {
-      console.error('Failed to export world:', error);
-      toast.error(error?.message || 'Failed to export world.');
-    } finally {
-      setIsWorking(false);
-    }
-  };
 
   const handleDeleteWorld = async (worldId: string, worldName: string) => {
     if (!confirm(`Delete "${worldName}"? This cannot be undone.`)) {
@@ -212,7 +197,7 @@ export function WorldManager({
             className="border border-glass-divider rounded-lg p-3 flex items-center justify-between bg-glass-bg/60"
           >
             <div>
-              <div className="font-medium text-glass-text">
+              <div className="font-serif font-medium text-glass-text">
                 {world.name || 'Untitled World'}
               </div>
               <div className="text-xs text-glass-sidebar space-x-2">
@@ -228,16 +213,8 @@ export function WorldManager({
                 onClick={() => handleLoadWorld(world.worldId)}
                 disabled={effectiveLoading}
               >
-                Load
-              </Button>
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={() => handleExportWorld(world.worldId, world.name)}
-                disabled={effectiveLoading}
-              >
-                <Download className="h-3 w-3 mr-1" />
-                Export
+                <FolderOpen className="h-3 w-3 mr-1" />
+                {/* Load */}
               </Button>
               <Button
                 size="sm"
@@ -247,7 +224,7 @@ export function WorldManager({
                 disabled={effectiveLoading}
               >
                 <Trash2 className="h-3 w-3 mr-1" />
-                Delete
+                {/* Delete */}
               </Button>
             </div>
           </div>
@@ -261,16 +238,6 @@ export function WorldManager({
 
       <div className="space-y-2">
         <div className="flex items-center justify-between">
-          <div className="text-xs uppercase text-glass-sidebar tracking-wide">Saved Worlds</div>
-            <Button
-              size="icon"
-              variant="ghost"
-              className="h-7 w-7 text-glass-sidebar hover:text-glass-text"
-              onClick={refreshWorldsList}
-              disabled={effectiveLoading}
-              >
-              <RefreshCw className="h-4 w-4" />
-            </Button>
           </div>
         {renderWorldsList()}
       </div>
@@ -280,9 +247,6 @@ export function WorldManager({
   if (variant === 'welcome') {
     return (
       <div className="space-y-3">
-        {/* <div className={`text-xs ${autoSaveClass} bg-glass-divider/20 border border-glass-divider rounded px-2 py-1`}>
-          {autoSaveMessage}
-        </div> */}
 
         <div>
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
@@ -293,12 +257,15 @@ export function WorldManager({
                 className="w-full justify-start text-glass-sidebar hover:text-glass-text hover:bg-glass-divider/30"
               >
                 <FolderOpen className="mr-2 h-3 w-3" />
-                {/* Manage worlds */}
+                Worlds
               </Button>
             </DialogTrigger>
-            <DialogContent className="bg-glass-bg border-glass-divider max-w-lg">
+            <DialogContent className="sm:max-w-lg glass-panel border-glass-divider !bg-glass-bg">
               <DialogHeader>
-                <DialogTitle className="text-glass-text">World Manager</DialogTitle>
+                <DialogTitle className="flex items-center gap-2 text-glass-text font-serif text-xl">
+                  <FolderOpen className="h-5 w-5" />
+                  Worlds
+                </DialogTitle>
               </DialogHeader>
               {managerContent}
             </DialogContent>
@@ -310,16 +277,7 @@ export function WorldManager({
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div>
-          <div className="text-xs uppercase text-glass-sidebar tracking-[0.28em]">World</div>
-          <div className="flex items-center gap-2">
-            <h2 className="text-glass-text font-serif text-lg font-medium">{currentWorld.name}</h2>
-            <Badge variant="secondary" className="bg-glass-divider/40 text-glass-sidebar">
-              {totalPages} {totalPages === 1 ? 'page' : 'pages'}
-            </Badge>
-          </div>
-        </div>
+      <div className="flex items-center justify-end">
         <div className="flex items-center gap-3">
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger asChild>
@@ -328,9 +286,12 @@ export function WorldManager({
                 {/* Manage */}
               </Button>
             </DialogTrigger>
-            <DialogContent className="bg-glass-bg border-glass-divider max-w-lg">
+            <DialogContent className="sm:max-w-lg glass-panel border-glass-divider !bg-glass-bg">
               <DialogHeader>
-                <DialogTitle className="text-glass-text">World Manager</DialogTitle>
+                <DialogTitle className="flex items-center gap-2 text-glass-text font-serif text-xl">
+                  <FolderOpen className="h-5 w-5" />
+                  Worlds
+                </DialogTitle>
               </DialogHeader>
               {managerContent}
             </DialogContent>
@@ -339,17 +300,6 @@ export function WorldManager({
         </div>
       </div>
 
-      <div className="space-y-3">
-        <div className="text-xs text-glass-sidebar">
-          Last saved: {
-            autoSaveInfo?.timestamp
-              ? formatDate(autoSaveInfo.timestamp)
-              : currentWorld.lastModified
-                ? formatDate(currentWorld.lastModified)
-                : 'never'
-          }
-        </div>
-      </div>
     </div>
   );
 }

@@ -177,7 +177,7 @@ export function WikiPage({ page, onTermClick, worldbuildingHistory, enableUserAp
           <button
             key={index}
             onClick={() => onTermClick(part, content)}
-            className="text-glass-accent hover:text-glass-accent/80 underline underline-offset-2 cursor-pointer bg-transparent border-none p-0 font-sans text-body leading-relaxed transition-colors"
+            className="text-glass-accent hover:text-glass-accent/80 underline underline-offset-2 cursor-pointer bg-transparent border-none p-0 font-sans text-base leading-relaxed transition-colors"
           >
             {part}
           </button>
@@ -312,9 +312,9 @@ export function WikiPage({ page, onTermClick, worldbuildingHistory, enableUserAp
           </div>
 
           {/* Main Content */}
-          <article className="prose prose-lg max-w-none mb-16">
+          <article className="prose prose-base max-w-none mb-16">
             {(streamingData?.content || page.content).split('\n\n').map((paragraph, idx) => (
-              <p key={idx} className={`mb-8 text-body leading-relaxed text-glass-text font-sans ${
+              <p key={idx} className={`mb-8 text-base leading-relaxed text-glass-text font-sans ${
                 isStreaming ? 'animate-fade-in' : ''
               }`}>
                 {renderContentWithLinks(paragraph)}

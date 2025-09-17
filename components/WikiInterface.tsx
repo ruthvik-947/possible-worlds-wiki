@@ -3,7 +3,6 @@ import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from './ui/dialog';
 import { Loader, Upload, Menu, Sun, Moon, Settings, LogOut, Search } from 'lucide-react';
 import { WikiPage } from './WikiPage';
 import { generateWikiPage, WikiPageData } from './WikiGenerator';
@@ -46,7 +45,6 @@ export function WikiInterface() {
   const [streamingPageData, setStreamingPageData] = useState<WikiPageData | null>(null);
   const [isStreaming, setIsStreaming] = useState<boolean>(false);
   const [isApiDialogOpen, setIsApiDialogOpen] = useState<boolean>(false);
-  const [isHomeConfirmOpen, setIsHomeConfirmOpen] = useState<boolean>(false);
   const [autoSaveInfo, setAutoSaveInfo] = useState<AutoSaveInfo>({ status: 'idle' });
   const { isLoaded: isAuthLoaded, isSignedIn, getToken } = useAuth();
   const autoSaveTimeoutRef = useRef<number | null>(null);
@@ -643,7 +641,7 @@ export function WikiInterface() {
               </Button>
             )}
             <button
-              onClick={() => setIsHomeConfirmOpen(true)}
+              onClick={handleHome}
               className="text-2xl font-serif font-medium text-glass-bg tracking-wide hover:text-glass-bg/80 transition-colors cursor-pointer"
             >
               PWW
@@ -752,15 +750,6 @@ export function WikiInterface() {
                     </div>
                   )}
                   
-                  {(!enableUserApiKeys || !hasUserApiKey) && (
-                    <div className="w-full">
-                      <UsageIndicator
-                        usageInfo={currentUsageInfo}
-                        hasUserApiKey={hasUserApiKey}
-                        onUpgradeRequested={handleUpgradeRequested}
-                      />
-                    </div>
-                  )}
                   
                   <div className="flex gap-3 w-full">
                     {enableUserApiKeys && (
@@ -913,17 +902,19 @@ export function WikiInterface() {
                         >
                           {currentWorld.name}
                         </h3>
-                        <WorldManager
-                          currentWorld={currentWorld}
-                          onLoadWorld={handleLoadWorld}
-                          onNewWorld={handleNewWorld}
-                          onImportWorld={handleImportWorld}
-                          autoSaveInfo={autoSaveInfo}
-                        />
+                        <div className="flex items-center">
+                          <WorldManager
+                            currentWorld={currentWorld}
+                            onLoadWorld={handleLoadWorld}
+                            onNewWorld={handleNewWorld}
+                            onImportWorld={handleImportWorld}
+                            autoSaveInfo={autoSaveInfo}
+                          />
+                        </div>
                       </>
                     )}
                   </div>
-                  
+
                   {/* Worldbuilding Stats */}
                   <div className="text-xs space-y-1 mb-4 font-mono">
                     {Object.entries(currentWorld.worldbuilding).flatMap(([group, categories]) =>
@@ -935,6 +926,39 @@ export function WikiInterface() {
                           </div>
                         ))
                     )}
+                  </div>
+
+                  {/* Last saved section - separated by divider */}
+                  <div className="border-t border-glass-divider pt-3">
+                    <div className="text-xs text-glass-sidebar">
+                      Last saved: {
+                        autoSaveInfo?.timestamp
+                          ? (() => {
+                              const diffMs = Date.now() - autoSaveInfo.timestamp;
+                              if (diffMs < 5000) return 'just now';
+                              if (diffMs < 60000) return `${Math.max(1, Math.round(diffMs / 1000))}s ago`;
+                              if (diffMs < 3600000) return `${Math.round(diffMs / 60000)}m ago`;
+                              if (diffMs < 86400000) return `${Math.round(diffMs / 3600000)}h ago`;
+                              const date = new Date(autoSaveInfo.timestamp);
+                              const now = new Date();
+                              const diffHours = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60));
+                              if (diffHours < 24) return `${diffHours}h ago`;
+                              if (diffHours < 48) return 'Yesterday';
+                              return date.toLocaleDateString();
+                            })()
+                          : currentWorld.lastModified
+                            ? (() => {
+                                const date = new Date(currentWorld.lastModified);
+                                const now = new Date();
+                                const diffHours = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60));
+                                if (diffHours < 1) return 'Just now';
+                                if (diffHours < 24) return `${diffHours}h ago`;
+                                if (diffHours < 48) return 'Yesterday';
+                                return date.toLocaleDateString();
+                              })()
+                            : 'never'
+                      }
+                    </div>
                   </div>
                 </div>
               </div>
@@ -972,35 +996,6 @@ export function WikiInterface() {
         )}
       </div>
 
-      {/* Home Confirmation Dialog */}
-      <Dialog open={isHomeConfirmOpen} onOpenChange={setIsHomeConfirmOpen}>
-        <DialogContent className="glass-panel border-glass-divider bg-glass-bg text-glass-text">
-          <DialogHeader>
-            <DialogTitle className="text-glass-text font-serif text-xl">Return to Welcome Screen?</DialogTitle>
-            <DialogDescription className="text-glass-sidebar mt-2">
-              This will clear your current world and return you to the welcome screen. Any unsaved progress will be lost.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter className="mt-6">
-            <Button
-              variant="ghost"
-              onClick={() => setIsHomeConfirmOpen(false)}
-              className="text-glass-sidebar hover:text-glass-text hover:bg-glass-divider/20 border border-glass-divider"
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={() => {
-                setIsHomeConfirmOpen(false);
-                handleHome();
-              }}
-              className="bg-glass-accent text-glass-bg hover:bg-glass-accent/90 font-medium"
-            >
-              Clear & Go Home
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
       <Toaster position="bottom-right" theme={isDarkMode ? 'dark' : 'light'} />
     </div>
