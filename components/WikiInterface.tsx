@@ -3,7 +3,8 @@ import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
-import { ArrowLeft, Home, Search, Loader, Upload, Menu, Sun, Moon, Settings, LogOut } from 'lucide-react';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from './ui/dialog';
+import { Loader, Upload, Menu, Sun, Moon, Settings, LogOut, Search } from 'lucide-react';
 import { WikiPage } from './WikiPage';
 import { generateWikiPage, WikiPageData } from './WikiGenerator';
 import { ApiKeyDialog } from './ApiKeyDialog';
@@ -45,6 +46,7 @@ export function WikiInterface() {
   const [streamingPageData, setStreamingPageData] = useState<WikiPageData | null>(null);
   const [isStreaming, setIsStreaming] = useState<boolean>(false);
   const [isApiDialogOpen, setIsApiDialogOpen] = useState<boolean>(false);
+  const [isHomeConfirmOpen, setIsHomeConfirmOpen] = useState<boolean>(false);
   const [pageImages, setPageImages] = useState<Map<string, string>>(new Map());
   const { isLoaded: isAuthLoaded, isSignedIn, getToken } = useAuth();
 
@@ -545,9 +547,12 @@ export function WikiInterface() {
                 <Menu className="h-4 w-4" />
               </Button>
             )}
-            <h1 className="text-2xl font-serif font-medium text-glass-bg tracking-wide">
+            <button
+              onClick={() => setIsHomeConfirmOpen(true)}
+              className="text-2xl font-serif font-medium text-glass-bg tracking-wide hover:text-glass-bg/80 transition-colors cursor-pointer"
+            >
               PWW
-            </h1>
+            </button>
           </div>
 
           {/* Center Search Bar */}
@@ -663,14 +668,21 @@ export function WikiInterface() {
                   
                   <div className="flex gap-3 w-full">
                     {enableUserApiKeys && (
-                      <ApiKeyDialog
-                        hasApiKey={hasUserApiKey}
-                        onStored={handleApiKeyStored}
-                        onRemoved={handleApiKeyRemoved}
-                        isLoading={isLoading}
-                        open={isApiDialogOpen}
-                        onOpenChange={setIsApiDialogOpen}
-                      />
+                      <div className="relative">
+                        <ApiKeyDialog
+                          hasApiKey={hasUserApiKey}
+                          onStored={handleApiKeyStored}
+                          onRemoved={handleApiKeyRemoved}
+                          isLoading={isLoading}
+                          open={isApiDialogOpen}
+                          onOpenChange={setIsApiDialogOpen}
+                        />
+                        {!hasUserApiKey && (
+                          <div className="text-xs text-glass-sidebar mt-1 text-center">
+                            5 free generations with PWW-keys per day
+                          </div>
+                        )}
+                      </div>
                     )}
                     <Button
                       onClick={handleGenerateFirstPage}
@@ -721,47 +733,6 @@ export function WikiInterface() {
               lg:fixed lg:top-16 lg:left-0 lg:bottom-0 lg:h-[calc(100vh-4rem)]
               ${isSidebarOpen ? 'translate-x-0 lg:translate-x-0 lg:w-[280px]' : '-translate-x-full lg:translate-x-0 lg:w-0 lg:border-r-0'}`}
             >
-              <div className="p-6 border-b border-glass-divider flex-shrink-0">
-                <div className="flex items-center gap-2 mb-6">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={handleBack}
-                    disabled={pageHistory.length === 0}
-                    className="h-8 w-8 p-0 text-glass-sidebar hover:text-glass-text hover:bg-glass-divider/30"
-                  >
-                    <ArrowLeft className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={handleHome}
-                    disabled={!currentPageId}
-                    className="h-8 w-8 p-0 text-glass-sidebar hover:text-glass-text hover:bg-glass-divider/30"
-                  >
-                    <Home className="h-4 w-4" />
-                  </Button>
-                </div>
-
-                <form onSubmit={handleSearch} className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-glass-sidebar" />
-                  <Input
-                    placeholder="Search pages..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-10 pr-10 border-glass-divider focus:border-glass-accent bg-glass-bg"
-                  />
-                  <Button
-                    type="submit"
-                    size="sm"
-                    variant="ghost"
-                    className="absolute right-2 top-1/2 -translate-y-1/2 h-6 w-6 p-0 text-glass-sidebar hover:text-glass-text hover:bg-glass-divider/30"
-                  >
-                    <Search className="h-4 w-4" />
-                  </Button>
-                </form>
-              </div>
-
               <div className="flex-1 p-6 flex flex-col min-h-0">
                 {(!enableUserApiKeys || !hasUserApiKey) && (
                   <div className="mb-4">
@@ -929,6 +900,37 @@ export function WikiInterface() {
           </>
         )}
       </div>
+
+      {/* Home Confirmation Dialog */}
+      <Dialog open={isHomeConfirmOpen} onOpenChange={setIsHomeConfirmOpen}>
+        <DialogContent className="glass-panel border-glass-divider bg-glass-bg text-glass-text">
+          <DialogHeader>
+            <DialogTitle className="text-glass-text font-serif text-xl">Return to Welcome Screen?</DialogTitle>
+            <DialogDescription className="text-glass-sidebar mt-2">
+              This will clear your current world and return you to the welcome screen. Any unsaved progress will be lost.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="mt-6">
+            <Button
+              variant="ghost"
+              onClick={() => setIsHomeConfirmOpen(false)}
+              className="text-glass-sidebar hover:text-glass-text hover:bg-glass-divider/20 border border-glass-divider"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={() => {
+                setIsHomeConfirmOpen(false);
+                handleHome();
+              }}
+              className="bg-glass-accent text-glass-bg hover:bg-glass-accent/90 font-medium"
+            >
+              Clear & Go Home
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <Toaster position="bottom-right" theme={isDarkMode ? 'dark' : 'light'} />
     </div>
   );

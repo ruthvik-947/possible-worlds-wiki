@@ -60,11 +60,14 @@ export function UsageIndicator({ onUpgradeRequested, usageInfo: propUsageInfo }:
     }
   }, [propUsageInfo, fetchUsage]);
 
+  // Always show the usage indicator if there's no API key set,
+  // even if usage is 0
   if (isLoading || !usageInfo) {
     return null;
   }
 
-  if (usageInfo.unlimited) {
+  // Show unlimited indicator when user has API key set
+  if (usageInfo.hasUserApiKey || usageInfo.unlimited) {
     return (
       <Card className="glass-panel border-glass-divider">
         <CardContent className="p-3">
@@ -87,16 +90,15 @@ export function UsageIndicator({ onUpgradeRequested, usageInfo: propUsageInfo }:
       <CardContent className="p-3 space-y-2">
         <div className="flex items-center justify-between text-sm">
           <span className="text-glass-text font-medium">
-            Free Usage Today
+            Free Generations Today
           </span>
-          {isAtLimit && (
-            <button
-              onClick={onUpgradeRequested}
-              className="text-xs text-blue-600 hover:text-blue-700 underline"
-            >
-              Add API Key
-            </button>
-          )}
+          <button
+            onClick={onUpgradeRequested}
+            className="p-1 text-glass-sidebar hover:text-glass-accent transition-colors"
+            title="Set API Key"
+          >
+            <Key className="h-4 w-4" />
+          </button>
         </div>
         
         <Progress 
