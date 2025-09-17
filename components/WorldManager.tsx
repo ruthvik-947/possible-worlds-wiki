@@ -258,65 +258,20 @@ export function WorldManager({
 
   const managerContent = (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div className="text-xs text-glass-sidebar bg-glass-divider/20 border border-glass-divider rounded px-2 py-1">
-          <AlertCircle className="h-3 w-3 inline mr-1" />
-          Worlds are stored securely on the server and scoped to your account.
-        </div>
-        <Button
-          size="icon"
-          variant="ghost"
-          className="h-7 w-7 text-glass-sidebar hover:text-glass-text"
-          onClick={refreshWorldsList}
-          disabled={effectiveLoading}
-        >
-          <RefreshCw className="h-4 w-4" />
-        </Button>
-      </div>
-
-      <div className={`text-xs ${autoSaveClass}`}>
-        {autoSaveMessage}
-      </div>
-
-      <div className="text-xs text-glass-sidebar space-y-1">
-        <div className="flex justify-between">
-          <span>Saved worlds:</span>
-          <span>{savedWorlds.length}</span>
-        </div>
-      </div>
-
-      <Button
-        onClick={handleNewWorld}
-        variant="outline"
-        className="w-full justify-start border-glass-divider"
-        disabled={effectiveLoading}
-      >
-        <FileText className="mr-2 h-4 w-4" />
-        Start New World
-      </Button>
-
-      {onImportWorld && (
-        <div>
-          <input
-            type="file"
-            accept=".json"
-            onChange={onImportWorld}
-            className="hidden"
-            id="import-world"
-            disabled={effectiveLoading}
-          />
-          <label
-            htmlFor="import-world"
-            className="flex items-center text-sm text-glass-sidebar hover:text-glass-text underline underline-offset-2 transition-colors cursor-pointer"
-          >
-            <Upload className="mr-2 h-3 w-3" />
-            Import world
-          </label>
-        </div>
-      )}
 
       <div className="space-y-2">
-        <div className="text-xs uppercase text-glass-sidebar tracking-wide">Saved Worlds</div>
+        <div className="flex items-center justify-between">
+          <div className="text-xs uppercase text-glass-sidebar tracking-wide">Saved Worlds</div>
+            <Button
+              size="icon"
+              variant="ghost"
+              className="h-7 w-7 text-glass-sidebar hover:text-glass-text"
+              onClick={refreshWorldsList}
+              disabled={effectiveLoading}
+              >
+              <RefreshCw className="h-4 w-4" />
+            </Button>
+          </div>
         {renderWorldsList()}
       </div>
     </div>
@@ -325,9 +280,9 @@ export function WorldManager({
   if (variant === 'welcome') {
     return (
       <div className="space-y-3">
-        <div className={`text-xs ${autoSaveClass} bg-glass-divider/20 border border-glass-divider rounded px-2 py-1`}>
+        {/* <div className={`text-xs ${autoSaveClass} bg-glass-divider/20 border border-glass-divider rounded px-2 py-1`}>
           {autoSaveMessage}
-        </div>
+        </div> */}
 
         <div>
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
@@ -338,7 +293,7 @@ export function WorldManager({
                 className="w-full justify-start text-glass-sidebar hover:text-glass-text hover:bg-glass-divider/30"
               >
                 <FolderOpen className="mr-2 h-3 w-3" />
-                Manage worlds
+                {/* Manage worlds */}
               </Button>
             </DialogTrigger>
             <DialogContent className="bg-glass-bg border-glass-divider max-w-lg">
@@ -370,7 +325,7 @@ export function WorldManager({
             <DialogTrigger asChild>
               <Button size="sm" variant="ghost" className="text-glass-sidebar hover:text-glass-text">
                 <FolderOpen className="mr-2 h-3 w-3" />
-                Manage
+                {/* Manage */}
               </Button>
             </DialogTrigger>
             <DialogContent className="bg-glass-bg border-glass-divider max-w-lg">
@@ -380,7 +335,7 @@ export function WorldManager({
               {managerContent}
             </DialogContent>
           </Dialog>
-          <span className={`text-xs ${autoSaveClass}`}>{autoSaveMessage}</span>
+          {/* <span className={`text-xs ${autoSaveClass}`}>{autoSaveMessage}</span> */}
         </div>
       </div>
 

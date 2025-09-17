@@ -936,26 +936,6 @@ export function WikiInterface() {
                         ))
                     )}
                   </div>
-
-
-                  {/* Import Button */}
-                  <div className="pt-3 border-t border-glass-divider">
-                    <input
-                      type="file"
-                      accept=".json"
-                      onChange={handleImportWorld}
-                      className="hidden"
-                      id="import-world-sidebar"
-                      disabled={isLoading}
-                    />
-                    <label
-                      htmlFor="import-world-sidebar"
-                      className="flex items-center text-sm text-glass-sidebar hover:text-glass-text underline underline-offset-2 transition-colors cursor-pointer"
-                    >
-                      <Upload className="mr-2 h-3 w-3" />
-                      Import world attributes
-                    </label>
-                  </div>
                 </div>
               </div>
 
