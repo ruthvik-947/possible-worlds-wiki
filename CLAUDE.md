@@ -47,7 +47,7 @@ Always run `npm run test:api-parity` before deploying to ensure development and 
 
 ## Architecture Overview
 
-This is a **PossibleWorldWiki** application - an AI-powered interactive worldbuilding wiki generator. The architecture consists of:
+This is a **PossibleWorldWikis** application - an AI-powered interactive worldbuilding wiki generator. The architecture consists of:
 
 ### Frontend (Vite + React + TypeScript)
 - **Main Interface**: `WikiInterface.tsx` - Central component managing wiki pages, navigation, and worldbuilding state

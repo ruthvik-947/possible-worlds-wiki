@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
@@ -23,6 +23,7 @@ import { config } from '../lib/config';
 import { worldPersistence } from '../lib/worldPersistence';
 import { WorldManager } from './WorldManager';
 import { Toaster, toast } from 'sonner';
+import { useAuth } from '@clerk/clerk-react';
 
 export function WikiInterface() {
   const [pages, setPages] = useState<Map<string, WikiPageData>>(new Map());
@@ -35,9 +36,8 @@ export function WikiInterface() {
   const [isEditingWorldName, setIsEditingWorldName] = useState(false);
   const [editedWorldName, setEditedWorldName] = useState('');
   const [importError, setImportError] = useState<string | null>(null);
-  const [apiKey, setApiKey] = useState<string>('');
-  const [sessionId, setSessionId] = useState<string>('');
   const [enableUserApiKeys, setEnableUserApiKeys] = useState<boolean>(false);
+  const [hasUserApiKey, setHasUserApiKey] = useState<boolean>(false);
   const [isDarkMode, setIsDarkMode] = useState<boolean>(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(true);
   const [currentUsageInfo, setCurrentUsageInfo] = useState<any>(null);
@@ -46,6 +46,7 @@ export function WikiInterface() {
   const [isStreaming, setIsStreaming] = useState<boolean>(false);
   const [isApiDialogOpen, setIsApiDialogOpen] = useState<boolean>(false);
   const [pageImages, setPageImages] = useState<Map<string, string>>(new Map());
+  const { isLoaded: isAuthLoaded, isSignedIn, getToken } = useAuth();
 
   // Helper function to show API key required toast with link to open dialog
   const showApiKeyRequiredToast = () => {
@@ -96,13 +97,89 @@ export function WikiInterface() {
     }
   }, [pages, currentPageId, pageHistory, currentWorld, pageImages]);
 
-  // Check configuration on mount
+  const requireAuthToken = useCallback(async () => {
+    const token = await getToken({ skipCache: true });
+    if (!token) {
+      throw new Error('Unable to retrieve authentication token from Clerk. Please sign in again.');
+    }
+    return token;
+  }, [getToken]);
+
+  // Check configuration once auth is available
   useEffect(() => {
-    fetch(config.endpoints.config)
-      .then(res => res.json())
-      .then(configData => setEnableUserApiKeys(configData.enableUserApiKeys))
-      .catch(err => console.error('Failed to fetch config:', err));
-  }, []);
+    if (!isAuthLoaded || !isSignedIn) {
+      setHasUserApiKey(false);
+      return;
+    }
+
+    let isActive = true;
+
+    const fetchConfig = async () => {
+      try {
+        const token = await requireAuthToken();
+        const response = await fetch(config.endpoints.config, {
+          headers: {
+            Authorization: `Bearer ${token}`
+          }
+        });
+
+        if (!response.ok) {
+          throw new Error(`Failed to load configuration (${response.status})`);
+        }
+
+        const configData = await response.json();
+        if (isActive) {
+          setEnableUserApiKeys(configData.enableUserApiKeys);
+        }
+      } catch (err) {
+        console.error('Failed to fetch config:', err);
+      }
+    };
+
+    fetchConfig();
+
+    return () => {
+      isActive = false;
+    };
+  }, [isAuthLoaded, isSignedIn, requireAuthToken]);
+
+  // Fetch whether the user already stored an API key
+  useEffect(() => {
+    if (!isAuthLoaded || !isSignedIn) {
+      setHasUserApiKey(false);
+      return;
+    }
+
+    let isActive = true;
+
+    const fetchStoredKeyStatus = async () => {
+      try {
+        const token = await requireAuthToken();
+        const response = await fetch(config.endpoints.storeKey, {
+          headers: {
+            Authorization: `Bearer ${token}`
+          }
+        });
+
+        if (!response.ok) {
+          throw new Error(`Failed to check stored API key (${response.status})`);
+        }
+
+        const data = await response.json();
+        if (isActive) {
+          setHasUserApiKey(Boolean(data.hasKey));
+        }
+      } catch (err) {
+        console.error('Failed to determine stored API key status:', err);
+      }
+    };
+
+    fetchStoredKeyStatus();
+
+    return () => {
+      isActive = false;
+    };
+  }, [isAuthLoaded, isSignedIn, requireAuthToken]);
 
   // Load dark mode preference and apply theme
   useEffect(() => {
@@ -119,9 +196,26 @@ export function WikiInterface() {
     document.documentElement.classList.toggle('dark', newDarkMode);
   };
 
-  const handleApiKeySet = (key: string, newSessionId: string) => {
-    setApiKey(key);
-    setSessionId(newSessionId);
+  const handleApiKeyStored = () => {
+    setHasUserApiKey(true);
+    setCurrentUsageInfo(null);
+    toast.success('API key saved for this session');
+  };
+
+  const handleApiKeyRemoved = () => {
+    setHasUserApiKey(false);
+    setCurrentUsageInfo(null);
+    toast.success('API key removed');
+  };
+
+  const handleUpgradeRequested = () => {
+    if (enableUserApiKeys) {
+      setIsApiDialogOpen(true);
+    } else {
+      toast.info('To get unlimited usage, enable user API keys in your environment configuration and provide your own OpenAI API key.', {
+        duration: 8000
+      });
+    }
   };
 
   const handleLoadWorld = (
@@ -215,16 +309,17 @@ export function WikiInterface() {
     setStreamingPageData(null);
 
     try {
+      const authToken = await requireAuthToken();
       const newPage = await generateWikiPage(
         term,
         'term',
         context,
         currentWorld.worldbuilding,
-        enableUserApiKeys ? sessionId : undefined,
         // Streaming callback
         (partialData: WikiPageData) => {
           setStreamingPageData(partialData);
-        }
+        },
+        authToken
       );
 
       // Update usage info from response
@@ -255,7 +350,9 @@ export function WikiInterface() {
       setStreamingPageData(null); // Clear streaming data when complete
     } catch (error: any) {
       console.error('Error generating page:', error);
-      if (error.code === 'RATE_LIMIT_EXCEEDED') {
+      if (error instanceof Error && error.message.includes('authentication token')) {
+        setErrorMessage(error.message);
+      } else if (error.code === 'RATE_LIMIT_EXCEEDED') {
         setErrorMessage(error.message);
         if (error.usageInfo) {
           setCurrentUsageInfo(error.usageInfo);
@@ -323,12 +420,12 @@ export function WikiInterface() {
     setStreamingPageData(null);
 
     try {
+      const authToken = await requireAuthToken();
       const firstPage = await generateWikiPage(
         seed,
         'seed',
         undefined,
         newWorld.worldbuilding,
-        enableUserApiKeys ? sessionId : undefined,
         // Streaming callback
         (partialData: WikiPageData) => {
           setStreamingPageData(partialData);
@@ -343,7 +440,8 @@ export function WikiInterface() {
             initialPages.set(partialData.id, partialData);
             setPages(initialPages);
           }
-        }
+        },
+        authToken
       );
 
       // Update usage info from response
@@ -374,7 +472,9 @@ export function WikiInterface() {
       setStreamingPageData(null); // Clear streaming data when complete
     } catch (error: any) {
       console.error('Error generating first page:', error);
-      if (error.code === 'RATE_LIMIT_EXCEEDED') {
+      if (error instanceof Error && error.message.includes('authentication token')) {
+        setErrorMessage(error.message);
+      } else if (error.code === 'RATE_LIMIT_EXCEEDED') {
         setErrorMessage(error.message);
         if (error.usageInfo) {
           setCurrentUsageInfo(error.usageInfo);
@@ -486,8 +586,9 @@ export function WikiInterface() {
             </Button>
             {enableUserApiKeys && (
               <ApiKeyDialog
-                onApiKeySet={handleApiKeySet}
-                isApiKeyValid={!!sessionId}
+                hasApiKey={hasUserApiKey}
+                onStored={handleApiKeyStored}
+                onRemoved={handleApiKeyRemoved}
                 isLoading={isLoading}
                 open={isApiDialogOpen}
                 onOpenChange={setIsApiDialogOpen}
@@ -514,7 +615,7 @@ export function WikiInterface() {
             <div className="w-full max-w-2xl animate-fade-in">
               <div className="text-center mb-12">
                 <h1 className="font-serif text-6xl font-medium text-glass-text mb-6 tracking-wide">
-                  PossibleWorldWiki
+                  PossibleWorldWikis
                 </h1>
                 {/* <div className="w-24 h-px bg-glass-divider mx-auto mb-6"></div> */}
                 {/* <p className="text-glass-sidebar text-lg leading-relaxed">
@@ -541,17 +642,11 @@ export function WikiInterface() {
                     </div>
                   )}
                   
-                  {(!enableUserApiKeys || !sessionId) && (
+                  {(!enableUserApiKeys || !hasUserApiKey) && (
                     <div className="w-full">
                       <UsageIndicator
-                        sessionId={sessionId}
                         usageInfo={currentUsageInfo}
-                        onUpgradeRequested={() => {
-                          // Show upgrade message or guide user to enable API keys
-                          toast.info('To get unlimited usage, enable user API keys in your environment configuration and provide your own OpenAI API key.', {
-                            duration: 8000
-                          });
-                        }}
+                        onUpgradeRequested={handleUpgradeRequested}
                       />
                     </div>
                   )}
@@ -559,8 +654,9 @@ export function WikiInterface() {
                   <div className="flex gap-3 w-full">
                     {enableUserApiKeys && (
                       <ApiKeyDialog
-                        onApiKeySet={handleApiKeySet}
-                        isApiKeyValid={!!sessionId}
+                        hasApiKey={hasUserApiKey}
+                        onStored={handleApiKeyStored}
+                        onRemoved={handleApiKeyRemoved}
                         isLoading={isLoading}
                         open={isApiDialogOpen}
                         onOpenChange={setIsApiDialogOpen}
@@ -657,16 +753,11 @@ export function WikiInterface() {
               </div>
 
               <div className="flex-1 p-6 flex flex-col min-h-0">
-                {(!enableUserApiKeys || !sessionId) && (
+                {(!enableUserApiKeys || !hasUserApiKey) && (
                   <div className="mb-4">
                     <UsageIndicator
-                      sessionId={sessionId}
                       usageInfo={currentUsageInfo}
-                      onUpgradeRequested={() => {
-                        toast.info('To get unlimited usage, enable user API keys in your environment configuration and provide your own OpenAI API key.', {
-                          duration: 8000
-                        });
-                      }}
+                      onUpgradeRequested={handleUpgradeRequested}
                     />
                   </div>
                 )}
@@ -817,7 +908,6 @@ export function WikiInterface() {
                 page={streamingPageData || currentPage}
                 onTermClick={handleTermClick}
                 worldbuildingHistory={currentWorld.worldbuilding}
-                sessionId={enableUserApiKeys ? sessionId : undefined}
                 enableUserApiKeys={enableUserApiKeys}
                 isStreaming={isStreaming}
                 streamingData={streamingPageData}

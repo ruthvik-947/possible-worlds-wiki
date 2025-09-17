@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent } from './ui/card';
 import { Progress } from './ui/progress';
 import { Key, Zap, AlertTriangle } from 'lucide-react';
 import { config } from '../lib/config';
+import { useAuth } from '@clerk/clerk-react';
 
 interface UsageInfo {
   hasUserApiKey: boolean;
@@ -13,23 +14,32 @@ interface UsageInfo {
 }
 
 interface UsageIndicatorProps {
-  sessionId?: string;
   onUpgradeRequested?: () => void;
   usageInfo?: UsageInfo | null;
 }
 
-export function UsageIndicator({ sessionId, onUpgradeRequested, usageInfo: propUsageInfo }: UsageIndicatorProps) {
+export function UsageIndicator({ onUpgradeRequested, usageInfo: propUsageInfo }: UsageIndicatorProps) {
   const [usageInfo, setUsageInfo] = useState<UsageInfo | null>(propUsageInfo || null);
   const [isLoading, setIsLoading] = useState(!propUsageInfo);
+  const { isLoaded, isSignedIn, getToken } = useAuth();
 
-  const fetchUsage = async () => {
+  const fetchUsage = useCallback(async () => {
+    if (!isLoaded || !isSignedIn) {
+      return;
+    }
+
     try {
       setIsLoading(true);
-      const url = sessionId 
-        ? `${config.endpoints.usage}?sessionId=${sessionId}`
-        : config.endpoints.usage;
+      const token = await getToken({ skipCache: true });
+      if (!token) {
+        throw new Error('Unable to retrieve authentication token');
+      }
       
-      const response = await fetch(url);
+      const response = await fetch(config.endpoints.usage, {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
       if (response.ok) {
         const data = await response.json();
         setUsageInfo(data);
@@ -39,7 +49,7 @@ export function UsageIndicator({ sessionId, onUpgradeRequested, usageInfo: propU
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [getToken, isLoaded, isSignedIn]);
 
   useEffect(() => {
     if (!propUsageInfo) {
@@ -48,7 +58,7 @@ export function UsageIndicator({ sessionId, onUpgradeRequested, usageInfo: propU
       setUsageInfo(propUsageInfo);
       setIsLoading(false);
     }
-  }, [sessionId, propUsageInfo]);
+  }, [propUsageInfo, fetchUsage]);
 
   if (isLoading || !usageInfo) {
     return null;

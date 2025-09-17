@@ -10,5 +10,6 @@ export const config = {
     generateSection: `${API_BASE_URL}/api/generate-section`,
     generateImage: `${API_BASE_URL}/api/generate-image`,
     usage: `${API_BASE_URL}/api/usage`,
+    storeKey: `${API_BASE_URL}/api/store-key`,
   }
 };

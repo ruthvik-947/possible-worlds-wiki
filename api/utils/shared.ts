@@ -1,17 +1,9 @@
 // Store API keys temporarily in memory (will be cleared on server restart)
 export const activeApiKeys = new Map<string, { apiKey: string; timestamp: number }>();
 
-// Store usage tracking per IP address with daily reset
-interface UsageData {
-  count: number;
-  lastResetDate: string; // YYYY-MM-DD format
-}
-
-export const dailyUsage = new Map<string, UsageData>();
-
 // Free tier limits - configurable via environment variables
 export function getFreeLimit(): number {
-  return parseInt(process.env.FREE_TIER_DAILY_LIMIT || '10', 10);
+  return parseInt(process.env.FREE_TIER_DAILY_LIMIT || '5', 10);
 }
 
 // For backwards compatibility
@@ -20,9 +12,9 @@ export const FREE_TIER_DAILY_LIMIT = getFreeLimit();
 // Clean up old API keys every hour
 setInterval(() => {
   const now = Date.now();
-  for (const [sessionId, data] of activeApiKeys.entries()) {
+  for (const [userId, data] of activeApiKeys.entries()) {
     if (now - data.timestamp > 24 * 60 * 60 * 1000) { // 24 hours
-      activeApiKeys.delete(sessionId);
+      activeApiKeys.delete(userId);
     }
   }
 }, 60 * 60 * 1000); // Check every hour
@@ -30,40 +22,6 @@ setInterval(() => {
 // Helper function to get current date in YYYY-MM-DD format (UTC)
 export function getCurrentDateString(): string {
   return new Date().toISOString().split('T')[0];
-}
-
-// Helper function to get or initialize usage for an IP
-export function getUsageForIP(ip: string): UsageData {
-  const currentDate = getCurrentDateString();
-  const usage = dailyUsage.get(ip);
-  
-  if (!usage || usage.lastResetDate !== currentDate) {
-    // Reset usage for new day
-    const newUsage: UsageData = { count: 0, lastResetDate: currentDate };
-    dailyUsage.set(ip, newUsage);
-    return newUsage;
-  }
-  
-  return usage;
-}
-
-// Helper function to increment usage for an IP
-export function incrementUsageForIP(ip: string): number {
-  const usage = getUsageForIP(ip);
-  usage.count++;
-  dailyUsage.set(ip, usage);
-  return usage.count;
-}
-
-// Helper function to check if IP has exceeded free tier limit
-export function hasExceededFreeLimit(ip: string): boolean {
-  // Check if bypass is enabled via environment variable
-  if (process.env.BYPASS_USAGE_LIMITS === 'true') {
-    return false; // Never exceed limit when bypass is enabled
-  }
-
-  const usage = getUsageForIP(ip);
-  return usage.count >= getFreeLimit();
 }
 
 export const worldbuildingCategories = {

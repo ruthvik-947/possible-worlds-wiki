@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import bodyParser from 'body-parser';
 import dotenv from 'dotenv';
+import { ClerkExpressWithAuth, ClerkExpressRequireAuth } from '@clerk/clerk-sdk-node';
 
 // Load environment variables from .env.local first, then .env
 dotenv.config({ path: '.env.local' });
@@ -14,9 +15,9 @@ import { activeApiKeys } from './utils/shared.js';
 // Clean up old API keys every hour
 setInterval(() => {
   const now = Date.now();
-  for (const [sessionId, data] of activeApiKeys.entries()) {
+  for (const [userId, data] of activeApiKeys.entries()) {
     if (now - data.timestamp > 24 * 60 * 60 * 1000) { // 24 hours
-      activeApiKeys.delete(sessionId);
+      activeApiKeys.delete(userId);
     }
   }
 }, 60 * 60 * 1000); // Check every hour
@@ -29,35 +30,66 @@ app.use(cors({
 }));
 app.use(bodyParser.json());
 
+if (!process.env.CLERK_SECRET_KEY) {
+  throw new Error('Missing CLERK_SECRET_KEY environment variable for Clerk authentication');
+}
+
+const clerkMiddleware = ClerkExpressWithAuth();
+
+app.use(clerkMiddleware);
+
 // Check if user API keys are enabled
-app.get('/api/config', (req: any, res: any) => {
+app.get('/api/config', ClerkExpressRequireAuth(), (req: any, res: any) => {
   res.json({
     enableUserApiKeys: process.env.ENABLE_USER_API_KEYS === 'true'
   });
 });
 
 // API key storage endpoint (no validation for now)
-app.post('/api/store-key', async (req: any, res: any) => {
+app.get('/api/store-key', ClerkExpressRequireAuth(), async (req: any, res: any) => {
+  const userId = req.auth?.userId;
+  if (!userId) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  const existing = activeApiKeys.get(userId);
+  res.json({ hasKey: !!existing });
+});
+
+app.post('/api/store-key', ClerkExpressRequireAuth(), async (req: any, res: any) => {
+  const userId = req.auth?.userId;
+  if (!userId) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
   const { apiKey } = req.body;
 
   if (!apiKey || !apiKey.startsWith('sk-')) {
     return res.status(400).json({ error: 'Invalid API key format' });
   }
 
-  // Store the API key with a session ID
-  const sessionId = Math.random().toString(36).substr(2, 9);
-  activeApiKeys.set(sessionId, { apiKey, timestamp: Date.now() });
+  activeApiKeys.set(userId, { apiKey, timestamp: Date.now() });
 
   res.json({ 
-    success: true, 
-    sessionId,
+    success: true,
     message: 'API key stored' 
   });
 });
 
-app.post('/api/generate', async (req: any, res: any) => {
+app.delete('/api/store-key', ClerkExpressRequireAuth(), async (req: any, res: any) => {
+  const userId = req.auth?.userId;
+  if (!userId) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
 
-  const { input, type, context, worldbuildingHistory, sessionId } = req.body;
+  activeApiKeys.delete(userId);
+  res.json({ success: true });
+});
+
+app.post('/api/generate', ClerkExpressRequireAuth(), async (req: any, res: any) => {
+
+  const { input, type, context, worldbuildingHistory } = req.body;
+  const userId = req.auth?.userId;
 
   // Set up streaming response headers
   res.setHeader('Content-Type', 'text/plain');
@@ -71,8 +103,8 @@ app.post('/api/generate', async (req: any, res: any) => {
       type,
       context,
       worldbuildingHistory,
-      sessionId,
-      'localhost', // clientIP for development
+      userId,
+      req.ip || 'localhost',
       (data: string) => res.write(data),
       () => res.end()
     );
@@ -95,9 +127,10 @@ app.post('/api/generate', async (req: any, res: any) => {
   }
 });
 
-app.post('/api/generate-section', async (req: any, res: any) => {
+app.post('/api/generate-section', ClerkExpressRequireAuth(), async (req: any, res: any) => {
 
-  const { sectionTitle, pageTitle, pageContent, worldbuildingHistory, sessionId } = req.body;
+  const { sectionTitle, pageTitle, pageContent, worldbuildingHistory } = req.body;
+  const userId = req.auth?.userId;
 
   // Set up streaming response headers
   res.setHeader('Content-Type', 'text/plain');
@@ -111,8 +144,8 @@ app.post('/api/generate-section', async (req: any, res: any) => {
       pageTitle,
       pageContent,
       worldbuildingHistory,
-      sessionId,
-      'localhost', // clientIP for development
+      userId,
+      req.ip || 'localhost',
       (data: string) => res.write(data), // writeData callback
       () => res.end() // endResponse callback
     );
@@ -132,9 +165,10 @@ app.post('/api/generate-section', async (req: any, res: any) => {
   }
 });
 
-app.post('/api/generate-image', async (req: any, res: any) => {
+app.post('/api/generate-image', ClerkExpressRequireAuth(), async (req: any, res: any) => {
 
-  const { pageTitle, pageContent, worldbuildingHistory, sessionId } = req.body;
+  const { pageTitle, pageContent, worldbuildingHistory } = req.body;
+  const userId = req.auth?.userId;
 
   // Set up streaming response headers
   res.setHeader('Content-Type', 'text/plain');
@@ -147,8 +181,8 @@ app.post('/api/generate-image', async (req: any, res: any) => {
       pageTitle,
       pageContent,
       worldbuildingHistory,
-      sessionId,
-      'localhost', // clientIP for development
+      userId,
+      req.ip || 'localhost',
       (data: string) => res.write(data), // writeData callback
       () => res.end() // endResponse callback
     );

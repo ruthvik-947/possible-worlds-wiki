@@ -3,16 +3,16 @@ import { Badge } from './ui/badge';
 import { Input } from './ui/input';
 import { WikiPageData, generateSectionContent, generatePageImage } from './WikiGenerator';
 import { Search, User, Settings, Bell, Eye, Edit, Star, ChevronRight, ChevronDown, FileText, ChevronUp, Plus, Loader2, Calendar, Clock, Sun, Image as ImageIcon } from 'lucide-react';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { WorldbuildingRecord } from './WorldbuildingHistory';
 import { Button } from './ui/button';
 import { toast } from 'sonner';
+import { useAuth } from '@clerk/clerk-react';
 
 interface WikiPageProps {
   page: WikiPageData;
   onTermClick: (term: string, context: string) => void;
   worldbuildingHistory?: WorldbuildingRecord;
-  sessionId?: string;
   enableUserApiKeys?: boolean;
   isStreaming?: boolean;
   streamingData?: WikiPageData | null;
@@ -127,7 +127,7 @@ const Infobox = ({
   </div>
 );
 
-export function WikiPage({ page, onTermClick, worldbuildingHistory, sessionId, enableUserApiKeys = false, isStreaming = false, streamingData, onUsageUpdate, generatedImageUrl, onImageGenerated }: WikiPageProps) {
+export function WikiPage({ page, onTermClick, worldbuildingHistory, enableUserApiKeys = false, isStreaming = false, streamingData, onUsageUpdate, generatedImageUrl, onImageGenerated }: WikiPageProps) {
 
   // If no page data is available, don't render anything
   if (!page) {
@@ -142,6 +142,16 @@ export function WikiPage({ page, onTermClick, worldbuildingHistory, sessionId, e
   // Image generation state
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
   const [imageProgress, setImageProgress] = useState<{ status: string; progress: number; message: string } | undefined>(undefined);
+
+  const { getToken } = useAuth();
+
+  const requireAuthToken = useCallback(async () => {
+    const token = await getToken({ skipCache: true });
+    if (!token) {
+      throw new Error('Unable to retrieve authentication token from Clerk. Please sign in again.');
+    }
+    return token;
+  }, [getToken]);
 
   // Reset sections when page changes
   useEffect(() => {
@@ -181,13 +191,25 @@ export function WikiPage({ page, onTermClick, worldbuildingHistory, sessionId, e
     if (!newSectionTitle.trim()) return;
 
     setIsGenerating(true);
+
+    let authToken: string;
+    try {
+      authToken = await requireAuthToken();
+    } catch (authError) {
+      console.error('Failed to fetch auth token for section generation:', authError);
+      toast.error(authError instanceof Error ? authError.message : 'Authentication error. Please sign in again.');
+      setIsGenerating(false);
+      return;
+    }
+
     try {
       const newSection = await generateSectionContent(
         newSectionTitle,
         page.title,
         page.content,
         worldbuildingHistory,
-        enableUserApiKeys ? sessionId : undefined
+        undefined,
+        authToken
       );
 
       setSections(prev => [...prev, newSection]);
@@ -200,7 +222,9 @@ export function WikiPage({ page, onTermClick, worldbuildingHistory, sessionId, e
       }
     } catch (error: any) {
       console.error('Failed to generate section:', error);
-      if (error.code === 'RATE_LIMIT_EXCEEDED' || error.code === 'API_KEY_REQUIRED') {
+      if (error instanceof Error && error.message.includes('authentication token')) {
+        toast.error(error.message);
+      } else if (error.code === 'RATE_LIMIT_EXCEEDED' || error.code === 'API_KEY_REQUIRED') {
         toast.error(error.message || 'Please provide your API key to continue generating content.');
       } else {
         toast.error('Failed to generate section. Please try again.');
@@ -216,15 +240,26 @@ export function WikiPage({ page, onTermClick, worldbuildingHistory, sessionId, e
     setIsGeneratingImage(true);
     setImageProgress({ status: 'generating', progress: 0, message: 'Starting image generation...' });
 
+    let authToken: string;
+    try {
+      authToken = await requireAuthToken();
+    } catch (authError) {
+      console.error('Failed to fetch auth token for image generation:', authError);
+      toast.error(authError instanceof Error ? authError.message : 'Authentication error. Please sign in again.');
+      setIsGeneratingImage(false);
+      setImageProgress(undefined);
+      return;
+    }
+
     try {
       const result = await generatePageImage(
         page.title,
         page.content,
         worldbuildingHistory,
-        enableUserApiKeys ? sessionId : undefined,
         (progress) => {
           setImageProgress(progress);
-        }
+        },
+        authToken
       );
 
       if (onImageGenerated) {
@@ -239,7 +274,9 @@ export function WikiPage({ page, onTermClick, worldbuildingHistory, sessionId, e
       toast.success('Image generated successfully!');
     } catch (error: any) {
       console.error('Failed to generate image:', error);
-      if (error.code === 'RATE_LIMIT_EXCEEDED' || error.code === 'API_KEY_REQUIRED') {
+      if (error instanceof Error && error.message.includes('authentication token')) {
+        toast.error(error.message);
+      } else if (error.code === 'RATE_LIMIT_EXCEEDED' || error.code === 'API_KEY_REQUIRED') {
         toast.error(error.message || 'Please provide your API key to continue generating content.');
       } else {
         toast.error('Failed to generate image. Please try again.');

@@ -7,11 +7,13 @@ import {
   allCategories,
   getWorldbuildingContext,
   capitalizeTitle,
-  hasExceededFreeLimit,
-  incrementUsageForIP,
-  getUsageForIP,
   getFreeLimit
 } from './utils/shared.js';
+import {
+  getUsageForUser,
+  incrementUsageForUser,
+  hasExceededUserLimit
+} from './utils/quota.js';
 
 // Helper function to generate structured metadata
 export async function generateMetadata(
@@ -132,7 +134,7 @@ export async function handleGenerate(
   type: 'seed' | 'term',
   context?: string,
   worldbuildingHistory?: any,
-  sessionId?: string,
+  userId?: string,
   clientIP?: string,
   writeData?: (data: string) => void,
   endResponse?: () => void
@@ -143,18 +145,23 @@ export async function handleGenerate(
       input
   );
 
-  // Get client IP for rate limiting (fallback for development)
-  const ip = clientIP || 'localhost';
-
   // Use API key from session if user API keys are enabled, otherwise use environment variable
   const enableUserApiKeys = process.env.ENABLE_USER_API_KEYS === 'true';
-  const sessionData = (enableUserApiKeys && sessionId) ? activeApiKeys.get(sessionId) : null;
+  const sessionData = (enableUserApiKeys && userId) ? activeApiKeys.get(userId) : null;
   const hasUserApiKey = !!sessionData?.apiKey;
+
+  if (!userId) {
+    throw {
+      status: 401,
+      error: 'Unauthorized',
+      message: 'Missing user context for request.'
+    };
+  }
 
   // If no user API key, check free tier limits
   if (!hasUserApiKey) {
-    if (hasExceededFreeLimit(ip)) {
-      const usage = getUsageForIP(ip);
+    if (await hasExceededUserLimit(userId)) {
+      const usage = await getUsageForUser(userId);
       throw {
         status: 429,
         error: 'Daily free limit reached',
@@ -292,13 +299,21 @@ The formation process remains largely mysterious, though most agree it occurs on
     }
   }
 
-  // If using free tier (no user API key), increment usage count
-  if (!hasUserApiKey) {
-    incrementUsageForIP(ip);
-  }
+  let usageInfo = null as null | {
+    usageCount: number;
+    dailyLimit: number;
+    remaining: number;
+  };
 
-  // Get current usage for response
-  const currentUsage = getUsageForIP(ip);
+  if (!hasUserApiKey) {
+    const usageAfterIncrement = await incrementUsageForUser(userId);
+    const dailyLimit = getFreeLimit();
+    usageInfo = {
+      usageCount: usageAfterIncrement.count,
+      dailyLimit,
+      remaining: Math.max(0, dailyLimit - usageAfterIncrement.count)
+    };
+  }
 
   const finalData = {
     id: pageId,
@@ -311,11 +326,7 @@ The formation process remains largely mysterious, though most agree it occurs on
     isPartial: false,
     isComplete: true,
     hasMetadata: true,
-    usageInfo: hasUserApiKey ? null : {
-      usageCount: currentUsage.count,
-      dailyLimit: getFreeLimit(),
-      remaining: getFreeLimit() - currentUsage.count
-    }
+    usageInfo
   };
 
   if (writeData) {
@@ -334,25 +345,30 @@ export async function handleGenerateSection(
   pageTitle: string,
   pageContent: string,
   worldbuildingHistory?: any,
-  sessionId?: string,
+  userId?: string,
   clientIP?: string,
   writeData?: (data: string) => void,
   endResponse?: () => void
 ) {
   const capitalizedSectionTitle = capitalizeTitle(sectionTitle);
 
-  // Get client IP for rate limiting (fallback for development)
-  const ip = clientIP || 'localhost';
-
   // Use API key from session if user API keys are enabled, otherwise use environment variable
   const enableUserApiKeys = process.env.ENABLE_USER_API_KEYS === 'true';
-  const sessionData = (enableUserApiKeys && sessionId) ? activeApiKeys.get(sessionId) : null;
+  const sessionData = (enableUserApiKeys && userId) ? activeApiKeys.get(userId) : null;
   const hasUserApiKey = !!sessionData?.apiKey;
+
+  if (!userId) {
+    throw {
+      status: 401,
+      error: 'Unauthorized',
+      message: 'Missing user context for request.'
+    };
+  }
 
   // If no user API key, check free tier limits
   if (!hasUserApiKey) {
-    if (hasExceededFreeLimit(ip)) {
-      const usage = getUsageForIP(ip);
+    if (await hasExceededUserLimit(userId)) {
+      const usage = await getUsageForUser(userId);
       throw {
         status: 429,
         error: 'Daily free limit reached',
@@ -415,13 +431,21 @@ export async function handleGenerateSection(
     }
   }
 
-  // If using free tier (no user API key), increment usage count
-  if (!hasUserApiKey) {
-    incrementUsageForIP(ip);
-  }
+  let usageInfo = null as null | {
+    usageCount: number;
+    dailyLimit: number;
+    remaining: number;
+  };
 
-  // Get current usage for response
-  const currentUsage = getUsageForIP(ip);
+  if (!hasUserApiKey) {
+    const usageAfterIncrement = await incrementUsageForUser(userId);
+    const dailyLimit = getFreeLimit();
+    usageInfo = {
+      usageCount: usageAfterIncrement.count,
+      dailyLimit,
+      remaining: Math.max(0, dailyLimit - usageAfterIncrement.count)
+    };
+  }
 
   // Send final complete text
   const finalData = {
@@ -429,11 +453,7 @@ export async function handleGenerateSection(
     content: accumulatedText.trim(),
     isPartial: false,
     isComplete: true,
-    usageInfo: hasUserApiKey ? null : {
-      usageCount: currentUsage.count,
-      dailyLimit: getFreeLimit(),
-      remaining: getFreeLimit() - currentUsage.count
-    }
+    usageInfo
   };
 
   if (writeData) {
@@ -451,23 +471,28 @@ export async function handleImageGeneration(
   pageTitle: string,
   pageContent: string,
   worldbuildingHistory?: any,
-  sessionId?: string,
+  userId?: string,
   clientIP?: string,
   writeData?: (data: string) => void,
   endResponse?: () => void
 ) {
-  // Get client IP for rate limiting (fallback for development)
-  const ip = clientIP || 'localhost';
-
   // Use API key from session if user API keys are enabled, otherwise use environment variable
   const enableUserApiKeys = process.env.ENABLE_USER_API_KEYS === 'true';
-  const sessionData = (enableUserApiKeys && sessionId) ? activeApiKeys.get(sessionId) : null;
+  const sessionData = (enableUserApiKeys && userId) ? activeApiKeys.get(userId) : null;
   const hasUserApiKey = !!sessionData?.apiKey;
+
+  if (!userId) {
+    throw {
+      status: 401,
+      error: 'Unauthorized',
+      message: 'Missing user context for request.'
+    };
+  }
 
   // If no user API key, check free tier limits
   if (!hasUserApiKey) {
-    if (hasExceededFreeLimit(ip)) {
-      const usage = getUsageForIP(ip);
+    if (await hasExceededUserLimit(userId)) {
+      const usage = await getUsageForUser(userId);
       throw {
         status: 429,
         error: 'Daily free limit reached',
@@ -532,28 +557,40 @@ export async function handleImageGeneration(
       }) + '\n\n');
     }
 
-    // If using free tier (no user API key), increment usage count
+    let usageInfo = null as null | {
+      usageCount: number;
+      dailyLimit: number;
+      remaining: number;
+    };
+
     if (!hasUserApiKey) {
-      incrementUsageForIP(ip);
+      const usageAfterIncrement = await incrementUsageForUser(userId);
+      const dailyLimit = getFreeLimit();
+      usageInfo = {
+        usageCount: usageAfterIncrement.count,
+        dailyLimit,
+        remaining: Math.max(0, dailyLimit - usageAfterIncrement.count)
+      };
     }
 
-    // Get current usage for response
-    const currentUsage = getUsageForIP(ip);
-
-    // The AI SDK v5 returns images as an array with base64Data, not URLs
-    const imageUrl = result.images && result.images.length > 0
-      ? `data:${result.images[0].mediaType};base64,${result.images[0].base64Data}`
+    const generatedImage = result.images && result.images.length > 0 ? result.images[0] : null;
+    const mediaType = generatedImage?.mediaType || 'image/png';
+    const imageUrl = generatedImage
+      ? (() => {
+          const base64Data = (generatedImage as any).base64Data;
+          if (base64Data) {
+            return `data:${mediaType};base64,${base64Data}`;
+          }
+          const url = (generatedImage as any).url;
+          return url || null;
+        })()
       : null;
 
     const finalData = {
       status: 'complete',
       imageUrl: imageUrl,
       prompt: imagePrompt,
-      usageInfo: hasUserApiKey ? null : {
-        usageCount: currentUsage.count,
-        dailyLimit: getFreeLimit(),
-        remaining: getFreeLimit() - currentUsage.count
-      }
+      usageInfo
     };
 
 

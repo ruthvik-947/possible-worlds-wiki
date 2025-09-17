@@ -25,21 +25,26 @@ export async function generateWikiPage(
   type: 'seed' | 'term',
   context?: string,
   worldbuildingHistory?: WorldbuildingRecord,
-  sessionId?: string,
-  onPartialUpdate?: (partialData: WikiPageData) => void
+  onPartialUpdate?: (partialData: WikiPageData) => void,
+  authToken?: string
 ): Promise<WikiPageData> {
   try {
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+
+    if (authToken) {
+      headers.Authorization = `Bearer ${authToken}`;
+    }
+
     const response = await fetch(config.endpoints.generate, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers,
       body: JSON.stringify({
         input,
         type,
         context,
-        worldbuildingHistory,
-        sessionId
+        worldbuildingHistory
       }),
     });
 
@@ -158,21 +163,26 @@ export async function generateSectionContent(
   pageTitle: string,
   pageContent: string,
   worldbuildingHistory?: WorldbuildingRecord,
-  sessionId?: string,
-  onPartialUpdate?: (partialData: { title: string; content: string }) => void
+  onPartialUpdate?: (partialData: { title: string; content: string }) => void,
+  authToken?: string
 ): Promise<{ title: string; content: string; usageInfo?: { usageCount: number; dailyLimit: number; remaining: number } | null }> {
   try {
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+
+    if (authToken) {
+      headers.Authorization = `Bearer ${authToken}`;
+    }
+
     const response = await fetch(config.endpoints.generateSection, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers,
       body: JSON.stringify({
         sectionTitle,
         pageTitle,
         pageContent,
-        worldbuildingHistory,
-        sessionId
+        worldbuildingHistory
       }),
     });
 
@@ -279,20 +289,25 @@ export async function generatePageImage(
   pageTitle: string,
   pageContent: string,
   worldbuildingHistory?: WorldbuildingRecord,
-  sessionId?: string,
-  onProgress?: (progress: { status: string; progress: number; message: string }) => void
+  onProgress?: (progress: { status: string; progress: number; message: string }) => void,
+  authToken?: string
 ): Promise<{ imageUrl: string; usageInfo?: { usageCount: number; dailyLimit: number; remaining: number } | null }> {
   try {
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+
+    if (authToken) {
+      headers.Authorization = `Bearer ${authToken}`;
+    }
+
     const response = await fetch(config.endpoints.generateImage || '/api/generate-image', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers,
       body: JSON.stringify({
         pageTitle,
         pageContent,
-        worldbuildingHistory,
-        sessionId
+        worldbuildingHistory
       }),
     });
 
@@ -354,7 +369,8 @@ export async function generatePageImage(
                   finalData = parsedObj;
                 }
               } catch (parseError) {
-                console.warn('Failed to parse streaming image data:', parseError.message.substring(0, 100));
+                const errorMessage = parseError instanceof Error ? parseError.message : String(parseError);
+                console.warn('Failed to parse streaming image data:', errorMessage.substring(0, 100));
                 continue;
               }
             }
