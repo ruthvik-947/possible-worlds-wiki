@@ -8,6 +8,7 @@ import {
   capitalizeTitle,
   getFreeLimit
 } from './utils/shared.js';
+import { uploadImageToBlob } from './utils/imageStorage.js';
 import {
   getUsageForUser,
   incrementUsageForUser,
@@ -479,7 +480,9 @@ export async function handleImageGeneration(
   userId?: string,
   clientIP?: string,
   writeData?: (data: string) => void,
-  endResponse?: () => void
+  endResponse?: () => void,
+  worldId?: string,
+  pageId?: string
 ) {
   // Use API key from session if user API keys are enabled, otherwise use environment variable
   const enableUserApiKeys = process.env.ENABLE_USER_API_KEYS === 'true';
@@ -579,17 +582,52 @@ export async function handleImageGeneration(
     }
 
     const generatedImage = result.images && result.images.length > 0 ? result.images[0] : null;
-    const mediaType = generatedImage?.mediaType || 'image/png';
-    const imageUrl = generatedImage
-      ? (() => {
-          const base64Data = (generatedImage as any).base64Data;
-          if (base64Data) {
-            return `data:${mediaType};base64,${base64Data}`;
+    let imageUrl: string | null = null;
+
+    if (generatedImage) {
+      const base64Data = (generatedImage as any).base64Data;
+      const url = (generatedImage as any).url;
+
+      if (base64Data || url) {
+        // If we have blob storage configured and required IDs, upload to blob
+        if (process.env.BLOB_READ_WRITE_TOKEN && worldId && pageId) {
+          try {
+            const mediaType = generatedImage?.mediaType || 'image/png';
+            const imageData = base64Data
+              ? `data:${mediaType};base64,${base64Data}`
+              : url;
+
+            imageUrl = await uploadImageToBlob({
+              userId: userId!,
+              worldId,
+              pageId,
+              imageData
+            });
+
+            if (writeData) {
+              writeData('data: ' + JSON.stringify({
+                status: 'generating',
+                progress: 95,
+                message: 'Uploading image to storage...'
+              }) + '\n\n');
+            }
+          } catch (uploadError) {
+            console.error('Failed to upload to blob storage, falling back to data URL:', uploadError);
+            // Fallback to data URL if upload fails
+            const mediaType = generatedImage?.mediaType || 'image/png';
+            imageUrl = base64Data
+              ? `data:${mediaType};base64,${base64Data}`
+              : url;
           }
-          const url = (generatedImage as any).url;
-          return url || null;
-        })()
-      : null;
+        } else {
+          // No blob storage configured, use data URL
+          const mediaType = generatedImage?.mediaType || 'image/png';
+          imageUrl = base64Data
+            ? `data:${mediaType};base64,${base64Data}`
+            : url;
+        }
+      }
+    }
 
     const finalData = {
       status: 'complete',

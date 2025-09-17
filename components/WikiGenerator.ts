@@ -291,7 +291,9 @@ export async function generatePageImage(
   pageContent: string,
   worldbuildingHistory?: WorldbuildingRecord,
   onProgress?: (progress: { status: string; progress: number; message: string }) => void,
-  authToken?: string
+  authToken?: string,
+  worldId?: string,
+  pageId?: string
 ): Promise<{ imageUrl: string; usageInfo?: { usageCount: number; dailyLimit: number; remaining: number } | null }> {
   try {
     const headers: Record<string, string> = {
@@ -308,7 +310,9 @@ export async function generatePageImage(
       body: JSON.stringify({
         pageTitle,
         pageContent,
-        worldbuildingHistory
+        worldbuildingHistory,
+        worldId,
+        pageId
       }),
     });
 

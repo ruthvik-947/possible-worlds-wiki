@@ -7,7 +7,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { pageTitle, pageContent, worldbuildingHistory } = req.body;
+  const { pageTitle, pageContent, worldbuildingHistory, worldId, pageId } = req.body;
   let userId: string;
 
   try {
@@ -39,7 +39,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       (data: string) => {
         res.write(data);
       },
-      () => res.end()
+      () => res.end(),
+      worldId,
+      pageId
     );
   } catch (error: any) {
     console.error('Vercel image generation error:', error);

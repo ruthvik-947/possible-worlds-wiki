@@ -276,7 +276,7 @@ app.post('/api/generate-section', ClerkExpressRequireAuth(), async (req: any, re
 
 app.post('/api/generate-image', ClerkExpressRequireAuth(), async (req: any, res: any) => {
 
-  const { pageTitle, pageContent, worldbuildingHistory } = req.body;
+  const { pageTitle, pageContent, worldbuildingHistory, worldId, pageId } = req.body;
   const userId = req.auth?.userId;
 
   // Set up streaming response headers
@@ -293,7 +293,9 @@ app.post('/api/generate-image', ClerkExpressRequireAuth(), async (req: any, res:
       userId,
       req.ip || 'localhost',
       (data: string) => res.write(data), // writeData callback
-      () => res.end() // endResponse callback
+      () => res.end(), // endResponse callback
+      worldId,
+      pageId
     );
   } catch (error: any) {
     console.error('Express: Image generation error:', error);

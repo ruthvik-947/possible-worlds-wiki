@@ -104,6 +104,7 @@ export function WikiInterface() {
 
     const snapshot = latestWorldRef.current;
     const pageCount = Object.keys(snapshot.pages || {}).length;
+
     if (pageCount === 0) {
       return;
     }
@@ -163,13 +164,14 @@ export function WikiInterface() {
       return;
     }
 
-    const shouldSchedule =
-      serialized !== lastSerializedRef.current || autoSaveInfo.status === 'error';
+    const dataChanged = serialized !== lastSerializedRef.current;
+    const shouldSchedule = dataChanged || autoSaveInfo.status === 'error';
 
     if (!shouldSchedule) {
       return;
     }
 
+    // Only update the reference after we've decided to schedule
     lastSerializedRef.current = serialized;
 
     if (autoSaveTimeoutRef.current !== null) {
@@ -441,6 +443,9 @@ export function WikiInterface() {
       setCurrentWorld(updatedWorld);
       navigateToPage(newPage.id);
       setStreamingPageData(null); // Clear streaming data when complete
+
+      // Directly trigger auto-save after page generation completes
+      setTimeout(() => performAutoSave(), 100);
     } catch (error: any) {
       console.error('Error generating page:', error);
       if (error instanceof Error && error.message.includes('authentication token')) {
@@ -558,6 +563,9 @@ export function WikiInterface() {
       setPages(finalPages);
       setCurrentWorld(updatedWorld);
       setStreamingPageData(null); // Clear streaming data when complete
+
+      // Directly trigger auto-save after seed page generation completes
+      setTimeout(() => performAutoSave(), 100);
     } catch (error: any) {
       console.error('Error generating first page:', error);
       if (error instanceof Error && error.message.includes('authentication token')) {
@@ -613,6 +621,25 @@ export function WikiInterface() {
       }
       return updated;
     });
+
+    // Trigger auto-save after image is generated
+    setTimeout(() => performAutoSave(), 100);
+  };
+
+  const handleSectionAdded = (pageId: string, section: { title: string; content: string }) => {
+    // Update the page in the pages map to include the new section
+    setPages(prev => {
+      const updated = new Map(prev);
+      const existingPage = updated.get(pageId);
+      if (existingPage) {
+        const updatedSections = [...(existingPage.sections || []), section];
+        updated.set(pageId, { ...existingPage, sections: updatedSections });
+      }
+      return updated;
+    });
+
+    // Trigger auto-save after section is added
+    setTimeout(() => performAutoSave(), 100);
   };
 
   const filteredPages = (pages: Map<string, WikiPageData>, query: string) => {
@@ -658,6 +685,7 @@ export function WikiInterface() {
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="pl-12 pr-12 bg-glass-bg/10 border-glass-divider/30 text-glass-text placeholder:text-glass-sidebar/70 rounded-full backdrop-blur-sm focus:bg-glass-bg/20 transition-colors"
+                  maxLength={200}
                 />
                 <Button
                   type="submit"
@@ -743,6 +771,7 @@ export function WikiInterface() {
                     value={seedSentence}
                     onChange={(e) => setSeedSentence(e.target.value)}
                     className="text-body border-glass-divider focus:border-glass-accent bg-glass-bg/50"
+                    maxLength={200}
                   />
                   {errorMessage && (
                     <div className="w-full p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
@@ -881,6 +910,7 @@ export function WikiInterface() {
                           className="h-7 text-sm"
                           placeholder="World name..."
                           autoFocus
+                          maxLength={100}
                         />
                         <Button
                           type="submit"
@@ -990,6 +1020,8 @@ export function WikiInterface() {
                 onUsageUpdate={setCurrentUsageInfo}
                 generatedImageUrl={currentPage?.imageUrl || undefined}
                 onImageGenerated={handleImageGenerated}
+                onSectionAdded={handleSectionAdded}
+                worldId={currentWorld.id}
               />
             </div>
           </>

@@ -19,6 +19,8 @@ interface WikiPageProps {
   onUsageUpdate?: (usageInfo: any) => void;
   generatedImageUrl?: string;
   onImageGenerated?: (pageId: string, imageUrl: string) => void;
+  onSectionAdded?: (pageId: string, section: { title: string; content: string }) => void;
+  worldId?: string;
 }
 
 // Infobox component for reuse
@@ -127,7 +129,7 @@ const Infobox = ({
   </div>
 );
 
-export function WikiPage({ page, onTermClick, worldbuildingHistory, enableUserApiKeys = false, isStreaming = false, streamingData, onUsageUpdate, generatedImageUrl, onImageGenerated }: WikiPageProps) {
+export function WikiPage({ page, onTermClick, worldbuildingHistory, enableUserApiKeys = false, isStreaming = false, streamingData, onUsageUpdate, generatedImageUrl, onImageGenerated, onSectionAdded, worldId }: WikiPageProps) {
 
   // If no page data is available, don't render anything
   if (!page) {
@@ -216,6 +218,11 @@ export function WikiPage({ page, onTermClick, worldbuildingHistory, enableUserAp
       setNewSectionTitle('');
       setIsAddingSection(false);
 
+      // Notify parent that a section was added
+      if (onSectionAdded) {
+        onSectionAdded(page.id, newSection);
+      }
+
       // Update usage info if provided and callback exists
       if (newSection.usageInfo && onUsageUpdate) {
         onUsageUpdate(newSection.usageInfo);
@@ -259,7 +266,9 @@ export function WikiPage({ page, onTermClick, worldbuildingHistory, enableUserAp
         (progress) => {
           setImageProgress(progress);
         },
-        authToken
+        authToken,
+        worldId,
+        page.id
       );
 
       if (onImageGenerated) {
@@ -337,7 +346,7 @@ export function WikiPage({ page, onTermClick, worldbuildingHistory, enableUserAp
                     {section.title}
                   </h2>
                   <div className="prose prose-lg max-w-none">
-                    <p className="text-body leading-relaxed text-glass-text font-sans">
+                    <p className="text-base leading-relaxed text-glass-text font-sans">
                       {renderContentWithLinks(section.content)}
                     </p>
                   </div>
@@ -371,6 +380,7 @@ export function WikiPage({ page, onTermClick, worldbuildingHistory, enableUserAp
                       placeholder="Enter section title..."
                       className="w-full px-4 py-3 border border-glass-divider rounded-lg focus:outline-none focus:border-glass-accent bg-glass-bg text-glass-text transition-colors"
                       disabled={isGenerating}
+                      maxLength={150}
                     />
                   </div>
                   <div className="flex space-x-3">
