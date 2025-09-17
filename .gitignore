@@ -4,6 +4,7 @@
 .cursor/
 .taskmaster/
 node_modules
+data/
 
 # Logs
 logs

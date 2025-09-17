@@ -10,6 +10,7 @@ export interface WikiPageData {
   relatedConcepts: { term: string; description: string }[];
   basicFacts: { name: string; value: string }[];
   sections?: { title: string; content: string }[];
+  imageUrl?: string | null;
   usageInfo?: {
     usageCount: number;
     dailyLimit: number;

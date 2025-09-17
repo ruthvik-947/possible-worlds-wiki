@@ -1,109 +1,164 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import { useAuth } from '@clerk/clerk-react';
 import { Button } from './ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
 import { Badge } from './ui/badge';
-import { Save, FolderOpen, Trash2, FileText, AlertCircle, Download, Upload } from 'lucide-react';
-import { worldPersistence, SavedWorld } from '../lib/worldPersistence';
-import { WikiPageData } from './WikiGenerator';
-import { World, exportWorld } from './WorldModel';
+import { Save, FolderOpen, Trash2, FileText, AlertCircle, Download, Upload, RefreshCw } from 'lucide-react';
+import { World, exportWorld, updateWorldMetadata } from './WorldModel';
 import { toast } from 'sonner';
+import {
+  fetchWorldSummaries,
+  fetchWorldById,
+  saveWorldToServer,
+  deleteWorldFromServer,
+  RemoteWorldSummary
+} from '../lib/worldService';
 
 interface WorldManagerProps {
   currentWorld: World;
-  pages: Map<string, WikiPageData>;
-  pageImages?: Map<string, string>;
-  onLoadWorld: (pages: Map<string, WikiPageData>, currentPageId: string | null, pageHistory: string[], world: World, pageImages?: Map<string, string>) => void;
+  onLoadWorld: (world: World) => void;
   onNewWorld: () => void;
   onImportWorld?: (event: React.ChangeEvent<HTMLInputElement>) => void;
   isLoading?: boolean;
   variant?: 'inline' | 'welcome';
 }
 
-export function WorldManager({ currentWorld, pages, pageImages, onLoadWorld, onNewWorld, onImportWorld, isLoading: parentLoading = false, variant = 'inline' }: WorldManagerProps) {
-  const [savedWorlds, setSavedWorlds] = useState<SavedWorld[]>([]);
+const formatDate = (timestamp: number) => {
+  const date = new Date(timestamp);
+  const now = new Date();
+  const diffHours = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60));
+
+  if (diffHours < 1) return 'Just now';
+  if (diffHours < 24) return `${diffHours}h ago`;
+  if (diffHours < 48) return 'Yesterday';
+  return date.toLocaleDateString();
+};
+
+export function WorldManager({
+  currentWorld,
+  onLoadWorld,
+  onNewWorld,
+  onImportWorld,
+  isLoading: parentLoading = false,
+  variant = 'inline'
+}: WorldManagerProps) {
+  const [savedWorlds, setSavedWorlds] = useState<RemoteWorldSummary[]>([]);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-  const [storageStats, setStorageStats] = useState(worldPersistence.getStorageStats());
+  const [isWorking, setIsWorking] = useState(false);
+  const { isLoaded: isAuthLoaded, isSignedIn, getToken } = useAuth();
 
-  // Load saved worlds on mount and refresh storage stats
-  useEffect(() => {
-    refreshWorldsList();
-  }, []);
+  const requireAuthToken = useCallback(async () => {
+    const token = await getToken({ skipCache: true });
+    if (!token) {
+      throw new Error('Please sign in again to manage your worlds.');
+    }
+    return token;
+  }, [getToken]);
 
-  const refreshWorldsList = () => {
-    setSavedWorlds(worldPersistence.getSavedWorlds());
-    setStorageStats(worldPersistence.getStorageStats());
-  };
-
-  const handleSaveWorld = async () => {
-    if (pages.size === 0) {
-      toast.error('No pages to save');
+  const refreshWorldsList = useCallback(async () => {
+    if (!isAuthLoaded || !isSignedIn) {
+      setSavedWorlds([]);
       return;
     }
 
-    setIsLoading(true);
-
-    // Check if world with this name already exists
-    const existingWorld = savedWorlds.find(world => world.name === currentWorld.name);
-
-    const success = worldPersistence.saveNamedWorld(currentWorld.name, pages, currentWorld, pageImages);
-
-    if (success) {
-      refreshWorldsList();
-      if (existingWorld) {
-        toast.success(`World "${currentWorld.name}" updated`);
-      } else {
-        toast.success(`World "${currentWorld.name}" saved for this session`);
-      }
-    } else {
-      toast.error('Failed to save world. Storage might be full.');
+    setIsWorking(true);
+    try {
+      const token = await requireAuthToken();
+      const worlds = await fetchWorldSummaries(token);
+      setSavedWorlds(worlds);
+    } catch (error) {
+      console.error('Failed to load worlds:', error);
+      toast.error('Failed to load your saved worlds.');
+    } finally {
+      setIsWorking(false);
     }
-    setIsLoading(false);
+  }, [isAuthLoaded, isSignedIn, requireAuthToken]);
+
+  useEffect(() => {
+    refreshWorldsList();
+  }, [refreshWorldsList]);
+
+  const handleSaveWorld = async () => {
+    const pageCount = Object.keys(currentWorld.pages || {}).length;
+    if (pageCount === 0) {
+      toast.error('No pages to save yet. Generate or add a page first.');
+      return;
+    }
+
+    setIsWorking(true);
+    try {
+      const token = await requireAuthToken();
+      const updatedWorld = updateWorldMetadata({
+        ...currentWorld,
+        lastModified: Date.now()
+      });
+
+      await saveWorldToServer(token, updatedWorld);
+      toast.success(`World "${updatedWorld.name}" saved to your account`);
+      onLoadWorld(updatedWorld);
+      await refreshWorldsList();
+    } catch (error: any) {
+      console.error('Failed to save world:', error);
+      toast.error(error?.message || 'Failed to save world.');
+    } finally {
+      setIsWorking(false);
+    }
   };
 
   const handleLoadWorld = async (worldId: string) => {
-    setIsLoading(true);
-    const worldState = worldPersistence.loadNamedWorld(worldId);
-
-    if (worldState) {
-      const pagesMap = new Map(worldState.pages);
-      const imagesMap = worldState.pageImages ? new Map(worldState.pageImages) : undefined;
-      onLoadWorld(pagesMap, worldState.currentPageId, worldState.pageHistory, worldState.currentWorld, imagesMap);
+    setIsWorking(true);
+    try {
+      const token = await requireAuthToken();
+      const record = await fetchWorldById(token, worldId);
+      onLoadWorld(record.world);
       setIsDialogOpen(false);
-      toast.success(`World "${worldState.currentWorld.name}" loaded`);
-    } else {
-      toast.error('Failed to load world. It may be corrupted.');
+      toast.success(`World "${record.world.name}" loaded`);
+    } catch (error: any) {
+      console.error('Failed to load world:', error);
+      toast.error(error?.message || 'Failed to load world.');
+    } finally {
+      setIsWorking(false);
     }
-    setIsLoading(false);
   };
 
   const handleExportWorld = async (worldId: string, worldName: string) => {
-    setIsLoading(true);
+    setIsWorking(true);
     try {
-      const worldState = worldPersistence.loadNamedWorld(worldId);
-      if (worldState) {
-        exportWorld(worldState.currentWorld);
-        toast.success(`World "${worldName}" exported - world attributes only, not individual pages`);
-      } else {
-        toast.error('Failed to load world for export');
-      }
-    } catch (error) {
-      toast.error('Failed to export world');
+      const token = await requireAuthToken();
+      const record = await fetchWorldById(token, worldId);
+      exportWorld(record.world);
+      toast.success(`World "${worldName}" exported`);
+    } catch (error: any) {
+      console.error('Failed to export world:', error);
+      toast.error(error?.message || 'Failed to export world.');
+    } finally {
+      setIsWorking(false);
     }
-    setIsLoading(false);
   };
 
-  const handleDeleteWorld = (worldId: string, worldName: string) => {
-    if (confirm(`Delete "${worldName}"? This cannot be undone.`)) {
-      worldPersistence.deleteWorld(worldId);
-      refreshWorldsList();
+  const handleDeleteWorld = async (worldId: string, worldName: string) => {
+    if (!confirm(`Delete "${worldName}"? This cannot be undone.`)) {
+      return;
+    }
+
+    setIsWorking(true);
+    try {
+      const token = await requireAuthToken();
+      await deleteWorldFromServer(token, worldId);
       toast.success(`World "${worldName}" deleted`);
+      await refreshWorldsList();
+    } catch (error: any) {
+      console.error('Failed to delete world:', error);
+      toast.error(error?.message || 'Failed to delete world.');
+    } finally {
+      setIsWorking(false);
     }
   };
 
   const handleNewWorld = () => {
-    if (pages.size > 0) {
-      if (confirm('Start a new world? Your current progress will remain saved.')) {
+    const pageCount = Object.keys(currentWorld.pages || {}).length;
+    if (pageCount > 0) {
+      if (confirm('Start a new world? Your current progress will remain saved once you store it.')) {
         onNewWorld();
         setIsDialogOpen(false);
       }
@@ -113,43 +168,138 @@ export function WorldManager({ currentWorld, pages, pageImages, onLoadWorld, onN
     }
   };
 
-  const formatDate = (timestamp: number) => {
-    const date = new Date(timestamp);
-    const now = new Date();
-    const diffHours = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60));
+  const totalPages = Object.keys(currentWorld.pages || {}).length;
+  const effectiveLoading = parentLoading || isWorking;
 
-    if (diffHours < 1) return 'Just now';
-    if (diffHours < 24) return `${diffHours}h ago`;
-    if (diffHours < 48) return 'Yesterday';
-    return date.toLocaleDateString();
-  };
+  const renderWorldsList = () => (
+    <div className="space-y-3">
+      {savedWorlds.length === 0 ? (
+        <div className="text-sm text-glass-sidebar bg-glass-divider/20 border border-glass-divider rounded p-3 text-center">
+          No saved worlds yet. 
+        </div>
+      ) : (
+        savedWorlds.map(world => (
+          <div
+            key={world.worldId}
+            className="border border-glass-divider rounded-lg p-3 flex items-center justify-between bg-glass-bg/60"
+          >
+            <div>
+              <div className="font-medium text-glass-text">
+                {world.name || 'Untitled World'}
+              </div>
+              <div className="text-xs text-glass-sidebar space-x-2">
+                <span>{formatDate(world.updatedAt)}</span>
+                <span>•</span>
+                <span>{world.pageCount} {world.pageCount === 1 ? 'page' : 'pages'}</span>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => handleLoadWorld(world.worldId)}
+                disabled={effectiveLoading}
+              >
+                Load
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => handleExportWorld(world.worldId, world.name)}
+                disabled={effectiveLoading}
+              >
+                <Download className="h-3 w-3 mr-1" />
+                Export
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="text-red-400 hover:text-red-500"
+                onClick={() => handleDeleteWorld(world.worldId, world.name)}
+                disabled={effectiveLoading}
+              >
+                <Trash2 className="h-3 w-3 mr-1" />
+                Delete
+              </Button>
+            </div>
+          </div>
+        ))
+      )}
+    </div>
+  );
 
-  const formatStorageSize = (bytes: number) => {
-    const kb = bytes / 1024;
-    if (kb < 1024) return `${Math.round(kb)}KB`;
-    return `${Math.round(kb / 1024)}MB`;
-  };
+  const managerContent = (
+    <div className="space-y-4">
+
+      {/* <Button
+        onClick={handleNewWorld}
+        variant="outline"
+        className="w-full justify-start border-glass-divider"
+        disabled={effectiveLoading}
+      >
+        <FileText className="mr-2 h-4 w-4" />
+        Start New World
+      </Button> */}
+
+      {/* {onImportWorld && (
+        <div>
+          <input
+            type="file"
+            accept=".json"
+            onChange={onImportWorld}
+            className="hidden"
+            id="import-world"
+            disabled={effectiveLoading}
+          />
+          <label
+            htmlFor="import-world"
+            className="flex items-center text-sm text-glass-sidebar hover:text-glass-text underline underline-offset-2 transition-colors cursor-pointer"
+          >
+            <Upload className="mr-2 h-3 w-3" />
+            Import world
+          </label>
+        </div>
+      )} */}
+
+      <div className="space-y-2">
+        
+        
+        <div className="flex items-center justify-between">
+          <div className="text-xs uppercase text-glass-sidebar tracking-wide">Saved Worlds</div>
+          <Button
+            size="icon"
+            variant="ghost"
+            className="h-7 w-7 text-glass-sidebar hover:text-glass-text"
+            onClick={refreshWorldsList}
+            disabled={effectiveLoading}
+          >
+            <RefreshCw className="h-4 w-4" />
+          </Button>
+        </div>
+
+        {renderWorldsList()}
+      </div>
+    </div>
+  );
 
   if (variant === 'welcome') {
     return (
       <div className="space-y-3">
-        {/* Save Current World */}
-        {pages.size > 0 && (
+        {totalPages > 0 && (
           <div>
             <Button
               variant="ghost"
               size="sm"
               className="w-full justify-start text-glass-sidebar hover:text-glass-text hover:bg-glass-divider/30"
               onClick={handleSaveWorld}
-              disabled={isLoading}
+              disabled={effectiveLoading}
             >
               <Save className="mr-2 h-3 w-3" />
-              {isLoading ? 'Saving world...' : 'Save world'}
+              {effectiveLoading ? 'Saving world...' : 'Save world'}
             </Button>
           </div>
         )}
 
-        {/* Load/Manage Worlds */}
         <div>
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger asChild>
@@ -162,300 +312,63 @@ export function WorldManager({ currentWorld, pages, pageImages, onLoadWorld, onN
                 Manage worlds
               </Button>
             </DialogTrigger>
-          <DialogContent className="bg-glass-bg border-glass-divider max-w-lg">
-            <DialogHeader>
-              <DialogTitle className="text-glass-text">World Manager</DialogTitle>
-            </DialogHeader>
-
-            <div className="space-y-4">
-              {/* Local Storage Notice */}
-              <div className="text-xs text-glass-sidebar bg-glass-divider/20 border border-glass-divider rounded p-2">
-                <AlertCircle className="h-3 w-3 inline mr-1" />
-                Worlds are stored locally in your browser and will persist until you clear browser data.
-                Data typically remains for months unless manually cleared. Not synced across devices.
-              </div>
-
-              {/* Storage Stats */}
-              <div className="text-xs text-glass-sidebar space-y-1">
-                <div className="flex justify-between">
-                  <span>Storage used:</span>
-                  <span>{formatStorageSize(storageStats.used)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Saved worlds:</span>
-                  <span>{storageStats.worldCount}</span>
-                </div>
-              </div>
-
-              {/* New World */}
-              <Button
-                onClick={handleNewWorld}
-                variant="outline"
-                className="w-full justify-start border-glass-divider"
-                disabled={isLoading}
-              >
-                <FileText className="mr-2 h-4 w-4" />
-                Start New World
-              </Button>
-
-              {/* Saved Worlds List */}
-              <div className="space-y-2 max-h-60 overflow-auto">
-                {savedWorlds.length === 0 ? (
-                  <div className="text-center py-8 text-glass-sidebar">
-                    <AlertCircle className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                    <p>No saved worlds yet</p>
-                    <p className="text-xs mt-1">Generate some pages and save your first world</p>
-                  </div>
-                ) : (
-                  savedWorlds.map((world) => (
-                    <div
-                      key={world.id}
-                      className="group border border-glass-divider rounded-lg p-3 hover:bg-glass-divider/20 transition-colors"
-                    >
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1 min-w-0">
-                          <div className="font-medium text-sm text-glass-text truncate">
-                            {world.name}
-                          </div>
-                          <div className="text-xs text-glass-sidebar mt-1 truncate">
-                            {world.preview}
-                          </div>
-                          <div className="flex items-center gap-4 mt-2 text-xs text-glass-sidebar">
-                            <span>{world.pageCount} pages</span>
-                            <span>{formatDate(world.lastModified)}</span>
-                          </div>
-                        </div>
-
-                        <div className="flex items-center gap-1 ml-2">
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => handleLoadWorld(world.id)}
-                            disabled={isLoading}
-                            className="h-8 w-8 p-0 text-glass-sidebar hover:text-glass-text"
-                            title="Load world"
-                          >
-                            <FolderOpen className="h-3 w-3" />
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => handleExportWorld(world.id, world.name)}
-                            disabled={isLoading}
-                            className="h-8 w-8 p-0 text-glass-sidebar hover:text-glass-accent"
-                            title="Export world"
-                          >
-                            <Download className="h-3 w-3" />
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => handleDeleteWorld(world.id, world.name)}
-                            disabled={isLoading}
-                            className="h-8 w-8 p-0 text-glass-sidebar hover:text-red-400"
-                            title="Delete world"
-                          >
-                            <Trash2 className="h-3 w-3" />
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-
-              {/* Storage Warning */}
-              {storageStats.used > storageStats.available * 0.8 && (
-                <div className="text-xs text-orange-400 bg-orange-400/10 border border-orange-400/20 rounded p-2">
-                  <AlertCircle className="h-3 w-3 inline mr-1" />
-                  Storage space running low. Consider deleting old worlds.
-                </div>
-              )}
-            </div>
-          </DialogContent>
+            <DialogContent className="bg-glass-bg border-glass-divider max-w-lg">
+              <DialogHeader>
+                <DialogTitle className="text-glass-text">World Manager</DialogTitle>
+              </DialogHeader>
+              {managerContent}
+            </DialogContent>
           </Dialog>
         </div>
-
-        {/* Import World */}
-        {onImportWorld && (
-          <div>
-            <input
-              type="file"
-              accept=".json"
-              onChange={onImportWorld}
-              className="hidden"
-              id="import-world-welcome"
-              disabled={parentLoading}
-            />
-            <label htmlFor="import-world-welcome">
-              <Button
-                variant="ghost"
-                size="sm"
-                className="w-full justify-start text-sm text-glass-sidebar hover:text-glass-text hover:bg-glass-divider/30"
-                disabled={parentLoading}
-                asChild
-              >
-                <span>
-                  <Upload className="mr-2 h-3 w-3" />
-                  Import world attributes
-                </span>
-              </Button>
-            </label>
-          </div>
-        )}
       </div>
     );
   }
 
-  // Inline variant for sidebar
   return (
-    <div className="flex items-center gap-1">
-      {/* Save Current World */}
-      {pages.size > 0 && (
-        <Button
-          variant="ghost"
-          size="sm"
-          className="h-8 w-8 p-0 text-glass-sidebar hover:text-glass-text"
-          onClick={handleSaveWorld}
-          disabled={isLoading}
-          title={isLoading ? 'Saving...' : 'Save world'}
-        >
-          <Save className="h-4 w-4" />
-        </Button>
-      )}
-
-      {/* Load/Manage Worlds */}
-      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogTrigger asChild>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-8 w-8 p-0 text-glass-sidebar hover:text-glass-text relative"
-            title="Manage worlds"
-          >
-            <FolderOpen className="h-4 w-4" />
-            {savedWorlds.length > 0 && (
-              <Badge
-                variant="secondary"
-                className="absolute -top-1 -right-1 h-4 w-4 p-0 text-xs flex items-center justify-center bg-glass-accent text-glass-bg rounded-full"
-              >
-                {savedWorlds.length}
-              </Badge>
-            )}
-          </Button>
-        </DialogTrigger>
-        <DialogContent className="bg-glass-bg border-glass-divider max-w-lg">
-          <DialogHeader>
-            <DialogTitle className="text-glass-text">World Manager</DialogTitle>
-          </DialogHeader>
-
-          <div className="space-y-4">
-            {/* Local Storage Notice */}
-            <div className="text-xs text-glass-sidebar bg-glass-divider/20 border border-glass-divider rounded p-2">
-              <AlertCircle className="h-3 w-3 inline mr-1" />
-              Worlds are stored locally in your browser and will persist until you clear browser data.
-              Data typically remains for months unless manually cleared. Not synced across devices.
-            </div>
-
-            {/* Storage Stats */}
-            <div className="text-xs text-glass-sidebar space-y-1">
-              <div className="flex justify-between">
-                <span>Storage used:</span>
-                <span>{formatStorageSize(storageStats.used)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span>Saved worlds:</span>
-                <span>{storageStats.worldCount}</span>
-              </div>
-            </div>
-
-            {/* New World */}
-            <Button
-              onClick={handleNewWorld}
-              variant="outline"
-              className="w-full justify-start border-glass-divider"
-              disabled={isLoading}
-            >
-              <FileText className="mr-2 h-4 w-4" />
-              Start New World
-            </Button>
-
-            {/* Saved Worlds List */}
-            <div className="space-y-2 max-h-60 overflow-auto">
-              {savedWorlds.length === 0 ? (
-                <div className="text-center py-8 text-glass-sidebar">
-                  <AlertCircle className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                  <p>No saved worlds yet</p>
-                  <p className="text-xs mt-1">Generate some pages and save your first world</p>
-                </div>
-              ) : (
-                savedWorlds.map((world) => (
-                  <div
-                    key={world.id}
-                    className="group border border-glass-divider rounded-lg p-3 hover:bg-glass-divider/20 transition-colors"
-                  >
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1 min-w-0">
-                        <div className="font-medium text-sm text-glass-text truncate">
-                          {world.name}
-                        </div>
-                        <div className="text-xs text-glass-sidebar mt-1 truncate">
-                          {world.preview}
-                        </div>
-                        <div className="flex items-center gap-4 mt-2 text-xs text-glass-sidebar">
-                          <span>{world.pageCount} pages</span>
-                          <span>{formatDate(world.lastModified)}</span>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-1 ml-2">
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => handleLoadWorld(world.id)}
-                          disabled={isLoading}
-                          className="h-8 w-8 p-0 text-glass-sidebar hover:text-glass-text"
-                          title="Load world"
-                        >
-                          <FolderOpen className="h-3 w-3" />
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => handleExportWorld(world.id, world.name)}
-                          disabled={isLoading}
-                          className="h-8 w-8 p-0 text-glass-sidebar hover:text-glass-accent"
-                          title="Export world"
-                        >
-                          <Download className="h-3 w-3" />
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => handleDeleteWorld(world.id, world.name)}
-                          disabled={isLoading}
-                          className="h-8 w-8 p-0 text-glass-sidebar hover:text-red-400"
-                          title="Delete world"
-                        >
-                          <Trash2 className="h-3 w-3" />
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-
-            {/* Storage Warning */}
-            {storageStats.used > storageStats.available * 0.8 && (
-              <div className="text-xs text-orange-400 bg-orange-400/10 border border-orange-400/20 rounded p-2">
-                <AlertCircle className="h-3 w-3 inline mr-1" />
-                Storage space running low. Consider deleting old worlds.
-              </div>
-            )}
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <div>
+          <div className="text-xs uppercase text-glass-sidebar tracking-[0.28em]">World</div>
+          <div className="flex items-center gap-2">
+            <h2 className="text-glass-text font-serif text-lg font-medium">{currentWorld.name}</h2>
+            <Badge variant="secondary" className="bg-glass-divider/40 text-glass-sidebar">
+              {totalPages} {totalPages === 1 ? 'page' : 'pages'}
+            </Badge>
           </div>
-        </DialogContent>
-      </Dialog>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={handleSaveWorld}
+            disabled={effectiveLoading || totalPages === 0}
+            className="border-glass-divider"
+          >
+            <Save className="mr-2 h-3 w-3" />
+            {effectiveLoading ? 'Saving...' : 'Save world'}
+          </Button>
+          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+            <DialogTrigger asChild>
+              <Button size="sm" variant="ghost" className="text-glass-sidebar hover:text-glass-text">
+                <FolderOpen className="mr-2 h-3 w-3" />
+                Manage
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="bg-glass-bg border-glass-divider max-w-lg">
+              <DialogHeader>
+                <DialogTitle className="text-glass-text">World Manager</DialogTitle>
+              </DialogHeader>
+              {managerContent}
+            </DialogContent>
+          </Dialog>
+        </div>
+      </div>
+
+      <div className="space-y-3">
+        <div className="text-xs text-glass-sidebar">
+          Last saved: {currentWorld.lastModified ? formatDate(currentWorld.lastModified) : 'never'}
+        </div>
+      </div>
     </div>
   );
 }

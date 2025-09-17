@@ -11,5 +11,6 @@ export const config = {
     generateImage: `${API_BASE_URL}/api/generate-image`,
     usage: `${API_BASE_URL}/api/usage`,
     storeKey: `${API_BASE_URL}/api/store-key`,
+    worlds: `${API_BASE_URL}/api/worlds`
   }
 };

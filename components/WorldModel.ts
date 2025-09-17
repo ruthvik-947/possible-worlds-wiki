@@ -1,4 +1,5 @@
 import { WorldbuildingRecord, createEmptyWorldbuildingRecord, validateWorldbuildingRecord } from './WorldbuildingHistory';
+import { WikiPageData } from './WikiGenerator';
 
 export interface World {
   id: string;
@@ -11,6 +12,9 @@ export interface World {
     version: string;
     entryCount: number;
   };
+  pages: Record<string, WikiPageData>;
+  currentPageId: string | null;
+  pageHistory: string[];
 }
 
 export function createNewWorld(name?: string): World {
@@ -24,7 +28,10 @@ export function createNewWorld(name?: string): World {
     metadata: {
       version: '1.0.0',
       entryCount: 0
-    }
+    },
+    pages: {},
+    currentPageId: null,
+    pageHistory: []
   };
 }
 
@@ -82,7 +89,7 @@ export function validateWorldWithErrors(data: any): string[] {
   }
 
   // Check required top-level fields
-  const requiredFields = ['id', 'name', 'createdAt', 'lastModified', 'worldbuilding', 'metadata'];
+  const requiredFields = ['id', 'name', 'createdAt', 'lastModified', 'worldbuilding', 'metadata', 'pages', 'currentPageId', 'pageHistory'];
   for (const field of requiredFields) {
     if (!(field in data)) {
       errors.push(`Missing required field: ${field}`);
@@ -122,6 +129,37 @@ export function validateWorldWithErrors(data: any): string[] {
         errors.push('Metadata field "entryCount" must be a number');
       }
     }
+  }
+
+  if ('pages' in data) {
+    if (!data.pages || typeof data.pages !== 'object') {
+      errors.push('Field "pages" must be an object with page entries');
+    } else {
+      for (const [pageId, pageData] of Object.entries<any>(data.pages)) {
+        if (typeof pageId !== 'string') {
+          errors.push('Each page key must be a string id');
+          break;
+        }
+        if (!pageData || typeof pageData !== 'object') {
+          errors.push(`Page "${pageId}" must be an object`);
+          continue;
+        }
+        const requiredPageFields = ['id', 'title', 'content', 'categories', 'clickableTerms', 'relatedConcepts', 'basicFacts'];
+        for (const field of requiredPageFields) {
+          if (!(field in pageData)) {
+            errors.push(`Page "${pageId}" missing required field: ${field}`);
+          }
+        }
+      }
+    }
+  }
+
+  if ('currentPageId' in data && data.currentPageId !== null && typeof data.currentPageId !== 'string') {
+    errors.push('Field "currentPageId" must be a string or null');
+  }
+
+  if ('pageHistory' in data && !Array.isArray(data.pageHistory)) {
+    errors.push('Field "pageHistory" must be an array');
   }
 
   return errors;

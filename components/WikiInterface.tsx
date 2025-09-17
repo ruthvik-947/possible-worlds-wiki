@@ -21,7 +21,6 @@ import {
   getWorldStats
 } from './WorldModel';
 import { config } from '../lib/config';
-import { worldPersistence } from '../lib/worldPersistence';
 import { WorldManager } from './WorldManager';
 import { Toaster, toast } from 'sonner';
 import { useAuth, SignOutButton } from '@clerk/clerk-react';
@@ -47,8 +46,16 @@ export function WikiInterface() {
   const [isStreaming, setIsStreaming] = useState<boolean>(false);
   const [isApiDialogOpen, setIsApiDialogOpen] = useState<boolean>(false);
   const [isHomeConfirmOpen, setIsHomeConfirmOpen] = useState<boolean>(false);
-  const [pageImages, setPageImages] = useState<Map<string, string>>(new Map());
   const { isLoaded: isAuthLoaded, isSignedIn, getToken } = useAuth();
+
+  useEffect(() => {
+    setCurrentWorld(prev => ({
+      ...prev,
+      pages: Object.fromEntries(pages),
+      currentPageId,
+      pageHistory
+    }));
+  }, [pages, currentPageId, pageHistory]);
 
   // Helper function to show API key required toast with link to open dialog
   const showApiKeyRequiredToast = () => {
@@ -64,40 +71,6 @@ export function WikiInterface() {
       }
     );
   };
-
-  // Load state from localStorage on mount
-  useEffect(() => {
-    const loadSavedState = () => {
-      // Check if user is intentionally on welcome screen
-      const isOnWelcomeScreen = localStorage.getItem('pww_on_welcome_screen') === 'true';
-
-      if (!isOnWelcomeScreen) {
-        const savedState = worldPersistence.loadCurrentWorld();
-        if (savedState && savedState.pages.length > 0) {
-          setPages(new Map(savedState.pages));
-          setCurrentPageId(savedState.currentPageId);
-          setPageHistory(savedState.pageHistory);
-          setCurrentWorld(savedState.currentWorld);
-          if (savedState.pageImages) {
-            setPageImages(new Map(savedState.pageImages));
-          }
-        }
-      }
-    };
-
-    loadSavedState();
-  }, []);
-
-  // Auto-save state to localStorage (debounced)
-  useEffect(() => {
-    if (pages.size > 0) {
-      const timeoutId = setTimeout(() => {
-        worldPersistence.saveCurrentWorld(pages, currentPageId, pageHistory, currentWorld, pageImages);
-      }, 1000); // Debounce saves by 1 second
-
-      return () => clearTimeout(timeoutId);
-    }
-  }, [pages, currentPageId, pageHistory, currentWorld, pageImages]);
 
   const requireAuthToken = useCallback(async () => {
     const token = await getToken({ skipCache: true });
@@ -221,33 +194,12 @@ export function WikiInterface() {
     }
   };
 
-  const handleLoadWorld = (
-    loadedPages: Map<string, WikiPageData>,
-    loadedCurrentPageId: string | null,
-    loadedPageHistory: string[],
-    loadedWorld: World,
-    loadedPageImages?: Map<string, string>
-  ) => {
-    // Clear welcome screen flag since user is now loading a world
-    localStorage.removeItem('pww_on_welcome_screen');
-
+  const handleLoadWorld = (loadedWorld: World) => {
+    const loadedPages = new Map<string, WikiPageData>(Object.entries(loadedWorld.pages || {}));
     setPages(loadedPages);
     setCurrentWorld(loadedWorld);
-    if (loadedPageImages) {
-      setPageImages(loadedPageImages);
-    } else {
-      setPageImages(new Map());
-    }
-
-    // If there's no current page ID but there are pages, show the first page
-    if (!loadedCurrentPageId && loadedPages.size > 0) {
-      const firstPageId = Array.from(loadedPages.keys())[0];
-      setCurrentPageId(firstPageId);
-      setPageHistory([]);
-    } else {
-      setCurrentPageId(loadedCurrentPageId);
-      setPageHistory(loadedPageHistory);
-    }
+    setCurrentPageId(loadedWorld.currentPageId || null);
+    setPageHistory(loadedWorld.pageHistory || []);
   };
 
   const handleNewWorld = () => {
@@ -256,7 +208,6 @@ export function WikiInterface() {
     setPageHistory([]);
     setCurrentWorld(createNewWorld());
     setSeedSentence('');
-    setPageImages(new Map());
   };
 
 
@@ -269,10 +220,12 @@ export function WikiInterface() {
 
     importWorld(file)
       .then((importedWorld) => {
+        const importedPages = new Map<string, WikiPageData>(Object.entries(importedWorld.pages || {}));
         setCurrentWorld(importedWorld);
-        setPages(new Map()); // Clear existing pages
-        setCurrentPageId(null);
-        setPageHistory([]);
+        setPages(importedPages);
+        const fallbackPageId = importedPages.size > 0 ? importedPages.keys().next().value : null;
+        setCurrentPageId(importedWorld.currentPageId ?? fallbackPageId ?? null);
+        setPageHistory(importedWorld.pageHistory || []);
         setSeedSentence('');
         // Use toast for success
         toast.success(`World "${importedWorld.name}" imported successfully!`);
@@ -292,9 +245,6 @@ export function WikiInterface() {
 
 
   const handleTermClick = async (term: string, context: string) => {
-    // Clear welcome screen flag since user is navigating to pages
-    localStorage.removeItem('pww_on_welcome_screen');
-
     // Check if page already exists
     const existingPageId = Array.from(pages.keys()).find(id =>
       pages.get(id)?.title.toLowerCase() === term.toLowerCase()
@@ -400,22 +350,15 @@ export function WikiInterface() {
     setPages(new Map());
     setCurrentWorld(createNewWorld());
     setSeedSentence('');
-    setPageImages(new Map());
-    // Set flag to indicate user is intentionally on welcome screen
-    localStorage.setItem('pww_on_welcome_screen', 'true');
   };
 
   const generateFirstPageWithSeed = async (seed: string) => {
-    // Clear welcome screen flag since user is now generating content
-    localStorage.removeItem('pww_on_welcome_screen');
-
     // Always start fresh - clear existing world state
     const newWorld = createNewWorld();
     setCurrentWorld(newWorld);
     setPages(new Map());
     setCurrentPageId(null);
     setPageHistory([]);
-    setPageImages(new Map());
 
     setIsLoading(true);
     setIsStreaming(true);
@@ -520,7 +463,14 @@ export function WikiInterface() {
   const currentPage = currentPageId ? pages.get(currentPageId) : null;
 
   const handleImageGenerated = (pageId: string, imageUrl: string) => {
-    setPageImages(prev => new Map(prev).set(pageId, imageUrl));
+    setPages(prev => {
+      const updated = new Map(prev);
+      const existingPage = updated.get(pageId);
+      if (existingPage) {
+        updated.set(pageId, { ...existingPage, imageUrl });
+      }
+      return updated;
+    });
   };
 
   const filteredPages = (pages: Map<string, WikiPageData>, query: string) => {
@@ -698,10 +648,8 @@ export function WikiInterface() {
                   </div>
                   
                   <div className="pt-6 border-t border-glass-divider">
-                    <WorldManager
+                  <WorldManager
                       currentWorld={currentWorld}
-                      pages={pages}
-                      pageImages={pageImages}
                       onLoadWorld={handleLoadWorld}
                       onNewWorld={handleNewWorld}
                       onImportWorld={handleImportWorld}
@@ -822,10 +770,9 @@ export function WikiInterface() {
                         </h3>
                         <WorldManager
                           currentWorld={currentWorld}
-                          pages={pages}
-                          pageImages={pageImages}
                           onLoadWorld={handleLoadWorld}
                           onNewWorld={handleNewWorld}
+                          onImportWorld={handleImportWorld}
                         />
                       </>
                     )}
@@ -891,7 +838,7 @@ export function WikiInterface() {
                 isStreaming={isStreaming}
                 streamingData={streamingPageData}
                 onUsageUpdate={setCurrentUsageInfo}
-                generatedImageUrl={currentPageId ? pageImages.get(currentPageId) : undefined}
+                generatedImageUrl={currentPage?.imageUrl || undefined}
                 onImageGenerated={handleImageGenerated}
               />
             </div>

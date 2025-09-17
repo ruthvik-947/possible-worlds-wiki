@@ -11,6 +11,7 @@ dotenv.config();
 // Import these AFTER loading environment variables
 import { handleGenerate, handleGenerateSection, handleImageGeneration } from './shared-handlers.js';
 import { storeApiKey, getApiKey, removeApiKey, hasApiKey } from './utils/apiKeyStorage.js';
+import { listWorlds, saveWorld, getWorld, deleteWorld } from './utils/worlds.js';
 import { getFreeLimit } from './utils/shared.js';
 import { getUsageForUser } from './utils/quota.js';
 
@@ -114,6 +115,84 @@ app.delete('/api/store-key', ClerkExpressRequireAuth(), async (req: any, res: an
 
   await removeApiKey(userId);
   res.json({ success: true });
+});
+
+app.get('/api/worlds', ClerkExpressRequireAuth(), async (req: any, res: any) => {
+  const userId = req.auth?.userId;
+  if (!userId) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  try {
+    const worlds = await listWorlds(userId);
+    res.json(worlds);
+  } catch (error) {
+    console.error('Failed to list worlds:', error);
+    res.status(500).json({ error: 'Failed to load worlds' });
+  }
+});
+
+app.get('/api/worlds/:worldId', ClerkExpressRequireAuth(), async (req: any, res: any) => {
+  const userId = req.auth?.userId;
+  if (!userId) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  const { worldId } = req.params;
+
+  try {
+    const record = await getWorld(userId, worldId);
+    if (!record) {
+      return res.status(404).json({ error: 'World not found' });
+    }
+
+    res.json(record);
+  } catch (error) {
+    console.error('Failed to get world:', error);
+    res.status(500).json({ error: 'Failed to load world' });
+  }
+});
+
+app.post('/api/worlds', ClerkExpressRequireAuth(), async (req: any, res: any) => {
+  const userId = req.auth?.userId;
+  if (!userId) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  const { world } = req.body;
+
+  if (!world || typeof world !== 'object') {
+    return res.status(400).json({ error: 'Missing world payload' });
+  }
+
+  try {
+    const summary = await saveWorld(userId, world);
+    res.json(summary);
+  } catch (error: any) {
+    console.error('Failed to save world:', error);
+    res.status(500).json({ error: error?.message || 'Failed to save world' });
+  }
+});
+
+app.delete('/api/worlds/:worldId', ClerkExpressRequireAuth(), async (req: any, res: any) => {
+  const userId = req.auth?.userId;
+  if (!userId) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  const { worldId } = req.params;
+
+  try {
+    const deleted = await deleteWorld(userId, worldId);
+    if (!deleted) {
+      return res.status(404).json({ error: 'World not found' });
+    }
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Failed to delete world:', error);
+    res.status(500).json({ error: 'Failed to delete world' });
+  }
 });
 
 app.post('/api/generate', ClerkExpressRequireAuth(), async (req: any, res: any) => {
