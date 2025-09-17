@@ -10,17 +10,9 @@ dotenv.config();
 
 // Import these AFTER loading environment variables
 import { handleGenerate, handleGenerateSection, handleImageGeneration } from './shared-handlers.js';
-import { activeApiKeys } from './utils/shared.js';
+import { storeApiKey, getApiKey, removeApiKey, hasApiKey } from './utils/apiKeyStorage.js';
 
-// Clean up old API keys every hour
-setInterval(() => {
-  const now = Date.now();
-  for (const [userId, data] of activeApiKeys.entries()) {
-    if (now - data.timestamp > 24 * 60 * 60 * 1000) { // 24 hours
-      activeApiKeys.delete(userId);
-    }
-  }
-}, 60 * 60 * 1000); // Check every hour
+// API key cleanup is now handled in apiKeyStorage.ts with Redis TTL
 
 const app = express();
 const port = process.env.PORT || 3001;
@@ -52,8 +44,8 @@ app.get('/api/store-key', ClerkExpressRequireAuth(), async (req: any, res: any) 
     return res.status(401).json({ error: 'Unauthorized' });
   }
 
-  const existing = activeApiKeys.get(userId);
-  res.json({ hasKey: !!existing });
+  const hasKey = await hasApiKey(userId);
+  res.json({ hasKey });
 });
 
 app.post('/api/store-key', ClerkExpressRequireAuth(), async (req: any, res: any) => {
@@ -68,11 +60,11 @@ app.post('/api/store-key', ClerkExpressRequireAuth(), async (req: any, res: any)
     return res.status(400).json({ error: 'Invalid API key format' });
   }
 
-  activeApiKeys.set(userId, { apiKey, timestamp: Date.now() });
+  await storeApiKey(userId, apiKey);
 
-  res.json({ 
+  res.json({
     success: true,
-    message: 'API key stored' 
+    message: 'API key stored securely'
   });
 });
 
@@ -82,7 +74,7 @@ app.delete('/api/store-key', ClerkExpressRequireAuth(), async (req: any, res: an
     return res.status(401).json({ error: 'Unauthorized' });
   }
 
-  activeApiKeys.delete(userId);
+  await removeApiKey(userId);
   res.json({ success: true });
 });
 

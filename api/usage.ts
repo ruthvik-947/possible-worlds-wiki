@@ -1,7 +1,8 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { getFreeLimit, activeApiKeys } from './utils/shared.js';
+import { getFreeLimit } from './utils/shared.js';
 import { getUsageForUser } from './utils/quota.js';
 import { getUserIdFromHeaders } from './utils/clerk.js';
+import { hasApiKey } from './utils/apiKeyStorage.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'GET') {
@@ -20,8 +21,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   // Check if user has API key
-  const storedKey = activeApiKeys.get(userId);
-  const hasUserApiKey = !!storedKey?.apiKey;
+  const hasUserApiKey = await hasApiKey(userId);
 
   if (hasUserApiKey) {
     res.json({

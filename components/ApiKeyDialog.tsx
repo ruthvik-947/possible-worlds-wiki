@@ -164,7 +164,7 @@ export function ApiKeyDialog({ hasApiKey, onStored, onRemoved, isLoading = false
               disabled={isSubmitting || isLoading}
             />
             <p className="text-xs text-glass-sidebar">
-              Note: Keys are stored in memory only and may need to be re-entered periodically.
+              Stored securely for 3 days (encrypted in database). Will persist across sessions.
             </p>
           </div>
 

@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { activeApiKeys } from './utils/shared.js';
 import { getUserIdFromHeaders } from './utils/clerk.js';
+import { storeApiKey, getApiKey, removeApiKey, hasApiKey } from './utils/apiKeyStorage.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   let userId: string;
@@ -14,8 +14,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   if (req.method === 'GET') {
-    const existing = activeApiKeys.get(userId);
-    return res.json({ hasKey: !!existing });
+    const hasKey = await hasApiKey(userId);
+    return res.json({ hasKey });
   }
 
   if (req.method === 'POST') {
@@ -25,12 +25,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(400).json({ error: 'Invalid API key format' });
     }
 
-    activeApiKeys.set(userId, { apiKey, timestamp: Date.now() });
-    return res.json({ success: true, message: 'API key stored' });
+    await storeApiKey(userId, apiKey);
+    return res.json({ success: true, message: 'API key stored securely' });
   }
 
   if (req.method === 'DELETE') {
-    activeApiKeys.delete(userId);
+    await removeApiKey(userId);
     return res.json({ success: true });
   }
 

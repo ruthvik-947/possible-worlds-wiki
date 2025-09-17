@@ -1,6 +1,3 @@
-// Store API keys temporarily in memory (will be cleared on server restart)
-export const activeApiKeys = new Map<string, { apiKey: string; timestamp: number }>();
-
 // Free tier limits - configurable via environment variables
 export function getFreeLimit(): number {
   return parseInt(process.env.FREE_TIER_DAILY_LIMIT || '5', 10);
@@ -8,16 +5,6 @@ export function getFreeLimit(): number {
 
 // For backwards compatibility
 export const FREE_TIER_DAILY_LIMIT = getFreeLimit();
-
-// Clean up old API keys every hour
-setInterval(() => {
-  const now = Date.now();
-  for (const [userId, data] of activeApiKeys.entries()) {
-    if (now - data.timestamp > 24 * 60 * 60 * 1000) { // 24 hours
-      activeApiKeys.delete(userId);
-    }
-  }
-}, 60 * 60 * 1000); // Check every hour
 
 // Helper function to get current date in YYYY-MM-DD format (UTC)
 export function getCurrentDateString(): string {

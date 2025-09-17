@@ -3,7 +3,6 @@ import { streamText, generateObject, experimental_generateImage as generateImage
 import { openai } from '@ai-sdk/openai';
 import { z } from 'zod';
 import {
-  activeApiKeys,
   allCategories,
   getWorldbuildingContext,
   capitalizeTitle,
@@ -14,6 +13,12 @@ import {
   incrementUsageForUser,
   hasExceededUserLimit
 } from './utils/quota.js';
+import {
+  storeApiKey,
+  getApiKey,
+  removeApiKey,
+  hasApiKey
+} from './utils/apiKeyStorage.js';
 
 // Helper function to generate structured metadata
 export async function generateMetadata(
@@ -147,8 +152,8 @@ export async function handleGenerate(
 
   // Use API key from session if user API keys are enabled, otherwise use environment variable
   const enableUserApiKeys = process.env.ENABLE_USER_API_KEYS === 'true';
-  const sessionData = (enableUserApiKeys && userId) ? activeApiKeys.get(userId) : null;
-  const hasUserApiKey = !!sessionData?.apiKey;
+  const userApiKey = (enableUserApiKeys && userId) ? await getApiKey(userId) : null;
+  const hasUserApiKey = !!userApiKey;
 
   if (!userId) {
     throw {
@@ -173,7 +178,7 @@ export async function handleGenerate(
     }
   }
 
-  const apiKey = hasUserApiKey ? sessionData!.apiKey : process.env.OPENAI_API_KEY;
+  const apiKey = hasUserApiKey ? userApiKey : process.env.OPENAI_API_KEY;
 
   // Allow testing without API key by proceeding with mock data
   if (!apiKey && process.env.NODE_ENV !== 'development') {
@@ -354,8 +359,8 @@ export async function handleGenerateSection(
 
   // Use API key from session if user API keys are enabled, otherwise use environment variable
   const enableUserApiKeys = process.env.ENABLE_USER_API_KEYS === 'true';
-  const sessionData = (enableUserApiKeys && userId) ? activeApiKeys.get(userId) : null;
-  const hasUserApiKey = !!sessionData?.apiKey;
+  const userApiKey = (enableUserApiKeys && userId) ? await getApiKey(userId) : null;
+  const hasUserApiKey = !!userApiKey;
 
   if (!userId) {
     throw {
@@ -380,7 +385,7 @@ export async function handleGenerateSection(
     }
   }
 
-  const apiKey = hasUserApiKey ? sessionData!.apiKey : process.env.OPENAI_API_KEY;
+  const apiKey = hasUserApiKey ? userApiKey : process.env.OPENAI_API_KEY;
 
   if (!apiKey) {
     throw {
@@ -478,8 +483,8 @@ export async function handleImageGeneration(
 ) {
   // Use API key from session if user API keys are enabled, otherwise use environment variable
   const enableUserApiKeys = process.env.ENABLE_USER_API_KEYS === 'true';
-  const sessionData = (enableUserApiKeys && userId) ? activeApiKeys.get(userId) : null;
-  const hasUserApiKey = !!sessionData?.apiKey;
+  const userApiKey = (enableUserApiKeys && userId) ? await getApiKey(userId) : null;
+  const hasUserApiKey = !!userApiKey;
 
   if (!userId) {
     throw {
@@ -504,7 +509,7 @@ export async function handleImageGeneration(
     }
   }
 
-  const apiKey = hasUserApiKey ? sessionData!.apiKey : process.env.OPENAI_API_KEY;
+  const apiKey = hasUserApiKey ? userApiKey : process.env.OPENAI_API_KEY;
 
   if (!apiKey) {
     throw {
