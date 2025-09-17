@@ -905,6 +905,8 @@ export function WikiInterface() {
                               name: editedWorldName.trim(),
                               lastModified: Date.now()
                             });
+                            // Trigger auto-save after world name change
+                            setTimeout(() => performAutoSave(), 100);
                           }
                           setIsEditingWorldName(false);
                         }}

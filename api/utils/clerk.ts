@@ -1,5 +1,5 @@
 import type { IncomingHttpHeaders } from 'http';
-import { verifyToken } from '@clerk/clerk-sdk-node';
+import { verifyToken } from '@clerk/express';
 
 const secretKey = process.env.CLERK_SECRET_KEY;
 

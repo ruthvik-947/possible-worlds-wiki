@@ -2,11 +2,10 @@ import express from 'express';
 import cors from 'cors';
 import bodyParser from 'body-parser';
 import dotenv from 'dotenv';
-import { ClerkExpressWithAuth, ClerkExpressRequireAuth } from '@clerk/clerk-sdk-node';
+import { clerkMiddleware, requireAuth } from '@clerk/express';
 
-// Load environment variables from .env.local first, then .env
+// Load environment variables from .env.local
 dotenv.config({ path: '.env.local' });
-dotenv.config();
 
 // Import these AFTER loading environment variables
 import { handleGenerate, handleGenerateSection, handleImageGeneration } from './shared-handlers.js';
@@ -29,19 +28,17 @@ if (!process.env.CLERK_SECRET_KEY) {
   throw new Error('Missing CLERK_SECRET_KEY environment variable for Clerk authentication');
 }
 
-const clerkMiddleware = ClerkExpressWithAuth();
-
-app.use(clerkMiddleware);
+app.use(clerkMiddleware());
 
 // Check if user API keys are enabled
-app.get('/api/config', ClerkExpressRequireAuth(), (req: any, res: any) => {
+app.get('/api/config', requireAuth(), (req: any, res: any) => {
   res.json({
     enableUserApiKeys: process.env.ENABLE_USER_API_KEYS === 'true'
   });
 });
 
 // Usage endpoint - get current usage for user
-app.get('/api/usage', ClerkExpressRequireAuth(), async (req: any, res: any) => {
+app.get('/api/usage', requireAuth(), async (req: any, res: any) => {
   const userId = req.auth?.userId;
   if (!userId) {
     return res.status(401).json({ error: 'Unauthorized' });
@@ -77,7 +74,7 @@ app.get('/api/usage', ClerkExpressRequireAuth(), async (req: any, res: any) => {
 });
 
 // API key storage endpoint (no validation for now)
-app.get('/api/store-key', ClerkExpressRequireAuth(), async (req: any, res: any) => {
+app.get('/api/store-key', requireAuth(), async (req: any, res: any) => {
   const userId = req.auth?.userId;
   if (!userId) {
     return res.status(401).json({ error: 'Unauthorized' });
@@ -87,7 +84,7 @@ app.get('/api/store-key', ClerkExpressRequireAuth(), async (req: any, res: any) 
   res.json({ hasKey });
 });
 
-app.post('/api/store-key', ClerkExpressRequireAuth(), async (req: any, res: any) => {
+app.post('/api/store-key', requireAuth(), async (req: any, res: any) => {
   const userId = req.auth?.userId;
   if (!userId) {
     return res.status(401).json({ error: 'Unauthorized' });
@@ -107,7 +104,7 @@ app.post('/api/store-key', ClerkExpressRequireAuth(), async (req: any, res: any)
   });
 });
 
-app.delete('/api/store-key', ClerkExpressRequireAuth(), async (req: any, res: any) => {
+app.delete('/api/store-key', requireAuth(), async (req: any, res: any) => {
   const userId = req.auth?.userId;
   if (!userId) {
     return res.status(401).json({ error: 'Unauthorized' });
@@ -117,7 +114,7 @@ app.delete('/api/store-key', ClerkExpressRequireAuth(), async (req: any, res: an
   res.json({ success: true });
 });
 
-app.get('/api/worlds', ClerkExpressRequireAuth(), async (req: any, res: any) => {
+app.get('/api/worlds', requireAuth(), async (req: any, res: any) => {
   const userId = req.auth?.userId;
   if (!userId) {
     return res.status(401).json({ error: 'Unauthorized' });
@@ -132,7 +129,7 @@ app.get('/api/worlds', ClerkExpressRequireAuth(), async (req: any, res: any) => 
   }
 });
 
-app.get('/api/worlds/:worldId', ClerkExpressRequireAuth(), async (req: any, res: any) => {
+app.get('/api/worlds/:worldId', requireAuth(), async (req: any, res: any) => {
   const userId = req.auth?.userId;
   if (!userId) {
     return res.status(401).json({ error: 'Unauthorized' });
@@ -153,7 +150,7 @@ app.get('/api/worlds/:worldId', ClerkExpressRequireAuth(), async (req: any, res:
   }
 });
 
-app.post('/api/worlds', ClerkExpressRequireAuth(), async (req: any, res: any) => {
+app.post('/api/worlds', requireAuth(), async (req: any, res: any) => {
   const userId = req.auth?.userId;
   if (!userId) {
     return res.status(401).json({ error: 'Unauthorized' });
@@ -174,7 +171,7 @@ app.post('/api/worlds', ClerkExpressRequireAuth(), async (req: any, res: any) =>
   }
 });
 
-app.delete('/api/worlds/:worldId', ClerkExpressRequireAuth(), async (req: any, res: any) => {
+app.delete('/api/worlds/:worldId', requireAuth(), async (req: any, res: any) => {
   const userId = req.auth?.userId;
   if (!userId) {
     return res.status(401).json({ error: 'Unauthorized' });
@@ -195,7 +192,7 @@ app.delete('/api/worlds/:worldId', ClerkExpressRequireAuth(), async (req: any, r
   }
 });
 
-app.post('/api/generate', ClerkExpressRequireAuth(), async (req: any, res: any) => {
+app.post('/api/generate', requireAuth(), async (req: any, res: any) => {
 
   const { input, type, context, worldbuildingHistory } = req.body;
   const userId = req.auth?.userId;
@@ -236,7 +233,7 @@ app.post('/api/generate', ClerkExpressRequireAuth(), async (req: any, res: any) 
   }
 });
 
-app.post('/api/generate-section', ClerkExpressRequireAuth(), async (req: any, res: any) => {
+app.post('/api/generate-section', requireAuth(), async (req: any, res: any) => {
 
   const { sectionTitle, pageTitle, pageContent, worldbuildingHistory } = req.body;
   const userId = req.auth?.userId;
@@ -274,7 +271,7 @@ app.post('/api/generate-section', ClerkExpressRequireAuth(), async (req: any, re
   }
 });
 
-app.post('/api/generate-image', ClerkExpressRequireAuth(), async (req: any, res: any) => {
+app.post('/api/generate-image', requireAuth(), async (req: any, res: any) => {
 
   const { pageTitle, pageContent, worldbuildingHistory, worldId, pageId } = req.body;
   const userId = req.auth?.userId;
