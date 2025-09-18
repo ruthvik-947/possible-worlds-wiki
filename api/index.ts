@@ -9,12 +9,12 @@ dotenv.config({ path: '.env.local' });
 
 // Import these AFTER loading environment variables
 import { handleGenerate, handleGenerateSection, handleImageGeneration } from './shared-handlers.js';
-import { storeApiKey, getApiKey, removeApiKey, hasApiKey } from './utils/apiKeyStorage.js';
+import { storeApiKey, getApiKey, removeApiKey, hasApiKey } from './utils/apiKeyVault.js';
 import { listWorlds, saveWorld, getWorld, deleteWorld } from './utils/worlds.js';
 import { getFreeLimit } from './utils/shared.js';
 import { getUsageForUser } from './utils/quota.js';
 
-// API key cleanup is now handled in apiKeyStorage.ts with Redis TTL
+// API key cleanup is now handled automatically by Supabase Vault TTL
 
 const app = express();
 const port = process.env.PORT || 3001;

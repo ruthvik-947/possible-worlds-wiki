@@ -2,7 +2,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { getFreeLimit } from './utils/shared.js';
 import { getUsageForUser } from './utils/quota.js';
 import { getUserIdFromHeaders } from './utils/clerk.js';
-import { hasApiKey } from './utils/apiKeyStorage.js';
+import { hasApiKey } from './utils/apiKeyVault.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'GET') {

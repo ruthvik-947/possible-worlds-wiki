@@ -14,12 +14,13 @@ import {
   incrementUsageForUser,
   hasExceededUserLimit
 } from './utils/quota.js';
+// Import the vault-based storage (which has fallback to in-memory)
 import {
   storeApiKey,
   getApiKey,
   removeApiKey,
   hasApiKey
-} from './utils/apiKeyStorage.js';
+} from './utils/apiKeyVault.js';
 
 // Helper function to generate structured metadata
 export async function generateMetadata(

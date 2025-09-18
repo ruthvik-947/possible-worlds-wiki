@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { getUserIdFromHeaders } from './utils/clerk.js';
-import { storeApiKey, getApiKey, removeApiKey, hasApiKey } from './utils/apiKeyStorage.js';
+import { storeApiKey, getApiKey, removeApiKey, hasApiKey } from './utils/apiKeyVault.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   let userId: string;
