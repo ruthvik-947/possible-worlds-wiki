@@ -47,7 +47,7 @@ const imageGenerationSchema = z.object({
 });
 
 const apiKeySchema = z.object({
-  apiKey: z.string().min(1, 'API key is required').regex(/^sk-[a-zA-Z0-9]{48,}$/, 'Invalid OpenAI API key format')
+  apiKey: z.string().min(1, 'API key is required').regex(/^sk-[a-zA-Z0-9_-]{20,}$/, 'Invalid OpenAI API key format')
 });
 
 // Helper function to validate and sanitize inputs

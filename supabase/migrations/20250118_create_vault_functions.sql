@@ -30,15 +30,14 @@ BEGIN
   LIMIT 1;
 
   IF v_secret_id IS NOT NULL THEN
-    -- Delete the existing secret
+    -- Delete the existing secret using proper vault API
     DELETE FROM vault.secrets WHERE id = v_secret_id;
   END IF;
 
-  -- Create a new secret in the vault
-  INSERT INTO vault.secrets (name, secret, description)
-  VALUES (
-    'openai_api_key_' || p_user_id,
+  -- Create a new secret in the vault using proper vault API
+  PERFORM vault.create_secret(
     p_api_key,
+    'openai_api_key_' || p_user_id,
     'OpenAI API key for user ' || p_user_id || ', expires at ' || v_expires_at
   );
 

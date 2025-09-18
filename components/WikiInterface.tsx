@@ -286,7 +286,7 @@ export function WikiInterface() {
     setHasUserApiKey(true);
     setCurrentUsageInfo(null);
     setErrorMessage(null); // Clear any error messages
-    toast.success('API key saved for this session');
+    toast.success('API key set');
   };
 
   const handleApiKeyRemoved = () => {
