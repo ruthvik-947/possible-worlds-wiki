@@ -3,6 +3,7 @@ import cors from 'cors';
 import bodyParser from 'body-parser';
 import dotenv from 'dotenv';
 import { clerkMiddleware, requireAuth } from '@clerk/express';
+import { createRateLimitMiddleware } from './utils/rateLimitMiddleware.js';
 
 // Load environment variables from .env.local
 dotenv.config({ path: '.env.local' });
@@ -30,15 +31,41 @@ if (!process.env.CLERK_SECRET_KEY) {
 
 app.use(clerkMiddleware());
 
+// Rate limiting middleware definitions
+const wikiRateLimit = createRateLimitMiddleware({
+  operationType: 'wikiGeneration',
+  getUserId: (req) => req.auth?.userId
+});
+
+const imageRateLimit = createRateLimitMiddleware({
+  operationType: 'imageGeneration',
+  getUserId: (req) => req.auth?.userId
+});
+
+const worldRateLimit = createRateLimitMiddleware({
+  operationType: 'worldOperations',
+  getUserId: (req) => req.auth?.userId
+});
+
+const apiKeyRateLimit = createRateLimitMiddleware({
+  operationType: 'apiKeyOperations',
+  getUserId: (req) => req.auth?.userId
+});
+
+const globalRateLimit = createRateLimitMiddleware({
+  operationType: 'global',
+  getUserId: (req) => req.auth?.userId
+});
+
 // Check if user API keys are enabled
-app.get('/api/config', requireAuth(), (req: any, res: any) => {
+app.get('/api/config', globalRateLimit, requireAuth(), (req: any, res: any) => {
   res.json({
     enableUserApiKeys: process.env.ENABLE_USER_API_KEYS === 'true'
   });
 });
 
 // Usage endpoint - get current usage for user
-app.get('/api/usage', requireAuth(), async (req: any, res: any) => {
+app.get('/api/usage', globalRateLimit, requireAuth(), async (req: any, res: any) => {
   const userId = req.auth?.userId;
   if (!userId) {
     return res.status(401).json({ error: 'Unauthorized' });
@@ -74,7 +101,7 @@ app.get('/api/usage', requireAuth(), async (req: any, res: any) => {
 });
 
 // API key storage endpoint (no validation for now)
-app.get('/api/store-key', requireAuth(), async (req: any, res: any) => {
+app.get('/api/store-key', apiKeyRateLimit, requireAuth(), async (req: any, res: any) => {
   const userId = req.auth?.userId;
   if (!userId) {
     return res.status(401).json({ error: 'Unauthorized' });
@@ -84,7 +111,7 @@ app.get('/api/store-key', requireAuth(), async (req: any, res: any) => {
   res.json({ hasKey });
 });
 
-app.post('/api/store-key', requireAuth(), async (req: any, res: any) => {
+app.post('/api/store-key', apiKeyRateLimit, requireAuth(), async (req: any, res: any) => {
   const userId = req.auth?.userId;
   if (!userId) {
     return res.status(401).json({ error: 'Unauthorized' });
@@ -104,7 +131,7 @@ app.post('/api/store-key', requireAuth(), async (req: any, res: any) => {
   });
 });
 
-app.delete('/api/store-key', requireAuth(), async (req: any, res: any) => {
+app.delete('/api/store-key', apiKeyRateLimit, requireAuth(), async (req: any, res: any) => {
   const userId = req.auth?.userId;
   if (!userId) {
     return res.status(401).json({ error: 'Unauthorized' });
@@ -114,7 +141,7 @@ app.delete('/api/store-key', requireAuth(), async (req: any, res: any) => {
   res.json({ success: true });
 });
 
-app.get('/api/worlds', requireAuth(), async (req: any, res: any) => {
+app.get('/api/worlds', worldRateLimit, requireAuth(), async (req: any, res: any) => {
   const userId = req.auth?.userId;
   if (!userId) {
     return res.status(401).json({ error: 'Unauthorized' });
@@ -129,7 +156,7 @@ app.get('/api/worlds', requireAuth(), async (req: any, res: any) => {
   }
 });
 
-app.get('/api/worlds/:worldId', requireAuth(), async (req: any, res: any) => {
+app.get('/api/worlds/:worldId', worldRateLimit, requireAuth(), async (req: any, res: any) => {
   const userId = req.auth?.userId;
   if (!userId) {
     return res.status(401).json({ error: 'Unauthorized' });
@@ -150,7 +177,7 @@ app.get('/api/worlds/:worldId', requireAuth(), async (req: any, res: any) => {
   }
 });
 
-app.post('/api/worlds', requireAuth(), async (req: any, res: any) => {
+app.post('/api/worlds', worldRateLimit, requireAuth(), async (req: any, res: any) => {
   const userId = req.auth?.userId;
   if (!userId) {
     return res.status(401).json({ error: 'Unauthorized' });
@@ -171,7 +198,7 @@ app.post('/api/worlds', requireAuth(), async (req: any, res: any) => {
   }
 });
 
-app.delete('/api/worlds/:worldId', requireAuth(), async (req: any, res: any) => {
+app.delete('/api/worlds/:worldId', worldRateLimit, requireAuth(), async (req: any, res: any) => {
   const userId = req.auth?.userId;
   if (!userId) {
     return res.status(401).json({ error: 'Unauthorized' });
@@ -192,7 +219,7 @@ app.delete('/api/worlds/:worldId', requireAuth(), async (req: any, res: any) => 
   }
 });
 
-app.post('/api/generate', requireAuth(), async (req: any, res: any) => {
+app.post('/api/generate', wikiRateLimit, requireAuth(), async (req: any, res: any) => {
 
   const { input, type, context, worldbuildingHistory } = req.body;
   const userId = req.auth?.userId;
@@ -233,7 +260,7 @@ app.post('/api/generate', requireAuth(), async (req: any, res: any) => {
   }
 });
 
-app.post('/api/generate-section', requireAuth(), async (req: any, res: any) => {
+app.post('/api/generate-section', wikiRateLimit, requireAuth(), async (req: any, res: any) => {
 
   const { sectionTitle, pageTitle, pageContent, worldbuildingHistory } = req.body;
   const userId = req.auth?.userId;
@@ -271,7 +298,7 @@ app.post('/api/generate-section', requireAuth(), async (req: any, res: any) => {
   }
 });
 
-app.post('/api/generate-image', requireAuth(), async (req: any, res: any) => {
+app.post('/api/generate-image', imageRateLimit, requireAuth(), async (req: any, res: any) => {
 
   const { pageTitle, pageContent, worldbuildingHistory, worldId, pageId } = req.body;
   const userId = req.auth?.userId;

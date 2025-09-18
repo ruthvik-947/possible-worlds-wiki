@@ -1,8 +1,9 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { getUserIdFromHeaders } from './utils/clerk.js';
 import { storeApiKey, getApiKey, removeApiKey, hasApiKey } from './utils/apiKeyVault.js';
+import { withRateLimit } from './utils/rateLimitMiddleware.js';
 
-export default async function handler(req: VercelRequest, res: VercelResponse) {
+async function handleStoreKey(req: VercelRequest, res: VercelResponse) {
   let userId: string;
   try {
     userId = await getUserIdFromHeaders(req.headers);
@@ -36,3 +37,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   return res.status(405).json({ error: 'Method not allowed' });
 }
+
+export default withRateLimit(
+  { operationType: 'apiKeyOperations' },
+  handleStoreKey
+);
