@@ -1,6 +1,7 @@
 // Shared API handlers that work with both Express and Vercel
 import { streamText, generateObject, experimental_generateImage as generateImage } from 'ai';
 import { openai } from '@ai-sdk/openai';
+import * as Sentry from '@sentry/node';
 import { z } from 'zod';
 import {
   allCategories,
@@ -216,7 +217,12 @@ export async function generateMetadata(
   });
 
   try {
-    const result = await generateObject({
+    const result = await Sentry.startSpan(
+      {
+        op: "ai.generate",
+        name: "Generate Page Metadata",
+      },
+      async () => generateObject({
       model: model,
       system: `You are a worldbuilding agent. You are deeply knowledgeable about history, mythology, cosmology, philosophy, science, and anthropology from around the world (not only the West), and have a Borgesian, and Pratchett-like imagination and a von-Neumann-esque sense of order.`,
       prompt: `Generate structured metadata for a wiki page in a possible universe about "${title}".
@@ -231,11 +237,15 @@ export async function generateMetadata(
       For relatedConcepts, list 2-4 related topics not directly mentioned.
       For basicFacts, list 3-4 key facts about the topic (e.g., year, location, population, and appropriate attributes like these). Follow the format: name | value`,
       schema: metadataSchema
-    });
+    }));
 
     return parseMetadata(result.object);
   } catch (e) {
     console.error('Failed to generate metadata:', e);
+    Sentry.captureException(e, {
+      tags: { operation: 'metadata_generation' },
+      extra: { input, type, context }
+    });
     // Fallback to mock data if generation fails
     return {
       categories: ["Magic & Mysticism", "Supernatural Phenomena"],
@@ -411,7 +421,12 @@ The formation process remains largely mysterious, though most agree it occurs on
   } else {
     const contentModel = openai('gpt-4o');
 
-    const result = await streamText({
+    const result = await Sentry.startSpan(
+      {
+        op: "ai.generate",
+        name: "Generate Wiki Content",
+      },
+      async () => streamText({
       model: contentModel,
       prompt: `You are a worldbuilding agent. You are deeply knowledgeable about history, mythology, cosmology, philosophy, science, and anthropology from around the world (not only the West), and have a Borgesian, and Pratchett-like imagination and a von-Neumann-esque sense of order. Generate a wiki page for a topic within a possible universe. Do not imply that this universe is fictional! To you and the user it is real.
 
@@ -429,7 +444,7 @@ The formation process remains largely mysterious, though most agree it occurs on
       Write a detailed and engaging encyclopedic article about "${title}". Write 3-4 paragraphs of rich, descriptive content that brings this topic to life. Be matter-of-fact and authoritative, no matter how fantastical the subject. ${worldbuildingHistory ? 'Ensure consistency with the existing worldbuilding context provided.' : ''}
 
       Write ONLY the article content. Do not include the title, headers, markdown-formatting, or any JSON metadata. Start directly with the first paragraph of content.`
-    });
+    }));
 
 
     for await (const textDelta of result.textStream) {
@@ -557,7 +572,12 @@ export async function handleGenerateSection(
   const model = openai('gpt-4o');
 
 
-  const result = await streamText({
+  const result = await Sentry.startSpan(
+    {
+      op: "ai.generate",
+      name: "Generate Wiki Section",
+    },
+    async () => streamText({
     model: model,
     prompt: `You are a creative worldbuilding assistant. Generate content for a new section of a wiki page.
 
@@ -574,7 +594,7 @@ export async function handleGenerateSection(
     - Not track real world entities or concepts much
 
     Write only the paragraph content. Do not include any labels, section headers, or markdown formatting.`
-  });
+  }));
 
   let accumulatedText = '';
 
@@ -709,7 +729,12 @@ export async function handleImageGeneration(
       }) + '\n\n');
     }
 
-    const result = await generateImage({
+    const result = await Sentry.startSpan(
+      {
+        op: "ai.generate",
+        name: "Generate Image with DALL-E",
+      },
+      async () => generateImage({
       model: openai.image('dall-e-3'),
       prompt: imagePrompt,
       n: 1,
@@ -720,7 +745,7 @@ export async function handleImageGeneration(
           style: 'natural'
         }
       }
-    });
+    }));
 
     if (writeData) {
       writeData('data: ' + JSON.stringify({
@@ -778,6 +803,10 @@ export async function handleImageGeneration(
             }
           } catch (uploadError) {
             console.error('Failed to upload to blob storage, falling back to data URL:', uploadError);
+            Sentry.captureException(uploadError, {
+              tags: { operation: 'blob_storage_upload' },
+              extra: { imagePrompt, pageId }
+            });
             // Fallback to data URL if upload fails
             const mediaType = generatedImage?.mediaType || 'image/png';
             imageUrl = base64Data
@@ -813,6 +842,10 @@ export async function handleImageGeneration(
     return finalData;
   } catch (error) {
     console.error('Image generation error:', error);
+    Sentry.captureException(error, {
+      tags: { operation: 'image_generation' },
+      extra: { pageTitle, pageContent, pageId }
+    });
     throw {
       status: 500,
       error: 'Image generation failed',

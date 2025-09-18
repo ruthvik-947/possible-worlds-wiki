@@ -204,7 +204,7 @@ app.use(helmet({
 
 - [x] ~~Set `API_KEY_ENCRYPTION_SECRET` environment variable~~ - Now using Supabase Vault
 - [ ] Fix high/critical dependency vulnerabilities
-- [ ] Implement request rate limiting
+- [x] Implement request rate limiting
 - [ ] Add server-side input validation with Zod schemas
 - [ ] Configure CORS with allowed origins
 - [ ] Add security headers with Helmet

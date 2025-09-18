@@ -16,6 +16,7 @@ if (process.env.NODE_ENV === 'production' && process.env.SENTRY_DSN) {
     dsn: process.env.SENTRY_DSN,
     environment: process.env.NODE_ENV || 'production',
     tracesSampleRate: 0.1, // 10% of transactions for performance monitoring
+    enableLogs: true, // Capture console errors automatically
     beforeSend(event) {
       // Don't send API key validation errors to reduce noise
       if (event.exception?.values?.[0]?.value?.includes('API key')) {
@@ -30,6 +31,7 @@ if (process.env.NODE_ENV === 'production' && process.env.SENTRY_DSN) {
 import { handleGenerate, handleGenerateSection, handleImageGeneration, handleStoreApiKey } from './shared-handlers.js';
 import { hasApiKey } from './utils/apiKeyVault.js';
 import { listWorlds, saveWorld, getWorld, deleteWorld } from './utils/worlds.js';
+import { listWorldsAuth, saveWorldAuth, getWorldAuth, deleteWorldAuth, testRLSIntegration } from './utils/worldsAuth.js';
 import { getFreeLimit } from './utils/shared.js';
 import { getUsageForUser } from './utils/quota.js';
 
@@ -39,9 +41,7 @@ const app = express();
 const port = process.env.PORT || 3001;
 
 // Add Sentry request handler middleware
-if (process.env.NODE_ENV === 'production' && process.env.SENTRY_DSN) {
-  app.use(Sentry.Handlers.requestHandler());
-}
+// Note: In Sentry v8, request/error handlers are set up differently
 
 // Add security headers
 app.use(helmet({
@@ -139,6 +139,7 @@ app.get('/api/usage', globalRateLimit, requireAuth(), async (req: any, res: any)
     }
   } catch (error) {
     console.error('Failed to get usage:', error);
+    Sentry.captureException(error, { tags: { operation: 'get_usage' } });
     res.status(500).json({ error: 'Failed to get usage information' });
   }
 });
@@ -150,6 +151,7 @@ app.get('/api/store-key', apiKeyRateLimit, requireAuth(), async (req: any, res: 
     res.json(result);
   } catch (error: any) {
     console.error('Store key GET error:', error);
+    Sentry.captureException(error, { tags: { operation: 'store_key_get' } });
     res.status(error.status || 500).json({
       error: error.error || 'Internal Server Error',
       message: error.message || 'An unexpected error occurred'
@@ -164,6 +166,7 @@ app.post('/api/store-key', apiKeyRateLimit, requireAuth(), async (req: any, res:
     res.json(result);
   } catch (error: any) {
     console.error('Store key POST error:', error);
+    Sentry.captureException(error, { tags: { operation: 'store_key_post' } });
     res.status(error.status || 500).json({
       error: error.error || 'Internal Server Error',
       message: error.message || 'An unexpected error occurred'
@@ -177,6 +180,7 @@ app.delete('/api/store-key', apiKeyRateLimit, requireAuth(), async (req: any, re
     res.json(result);
   } catch (error: any) {
     console.error('Store key DELETE error:', error);
+    Sentry.captureException(error, { tags: { operation: 'store_key_delete' } });
     res.status(error.status || 500).json({
       error: error.error || 'Internal Server Error',
       message: error.message || 'An unexpected error occurred'
@@ -191,10 +195,12 @@ app.get('/api/worlds', worldRateLimit, requireAuth(), async (req: any, res: any)
   }
 
   try {
-    const worlds = await listWorlds(userId);
+    // Use RLS-enabled function that authenticates via Clerk JWT
+    const worlds = await listWorldsAuth(req.headers);
     res.json(worlds);
   } catch (error) {
     console.error('Failed to list worlds:', error);
+    Sentry.captureException(error, { tags: { operation: 'list_worlds' } });
     res.status(500).json({ error: 'Failed to load worlds' });
   }
 });
@@ -208,7 +214,8 @@ app.get('/api/worlds/:worldId', worldRateLimit, requireAuth(), async (req: any, 
   const { worldId } = req.params;
 
   try {
-    const record = await getWorld(userId, worldId);
+    // Use RLS-enabled function that authenticates via Clerk JWT
+    const record = await getWorldAuth(req.headers, worldId);
     if (!record) {
       return res.status(404).json({ error: 'World not found' });
     }
@@ -216,6 +223,7 @@ app.get('/api/worlds/:worldId', worldRateLimit, requireAuth(), async (req: any, 
     res.json(record);
   } catch (error) {
     console.error('Failed to get world:', error);
+    Sentry.captureException(error, { tags: { operation: 'get_world' } });
     res.status(500).json({ error: 'Failed to load world' });
   }
 });
@@ -233,10 +241,12 @@ app.post('/api/worlds', worldRateLimit, requireAuth(), async (req: any, res: any
   }
 
   try {
-    const summary = await saveWorld(userId, world);
+    // Use RLS-enabled function that authenticates via Clerk JWT
+    const summary = await saveWorldAuth(req.headers, userId, world);
     res.json(summary);
   } catch (error: any) {
     console.error('Failed to save world:', error);
+    Sentry.captureException(error, { tags: { operation: 'save_world' } });
     res.status(500).json({ error: error?.message || 'Failed to save world' });
   }
 });
@@ -250,7 +260,8 @@ app.delete('/api/worlds/:worldId', worldRateLimit, requireAuth(), async (req: an
   const { worldId } = req.params;
 
   try {
-    const deleted = await deleteWorld(userId, worldId);
+    // Use RLS-enabled function that authenticates via Clerk JWT
+    const deleted = await deleteWorldAuth(req.headers, worldId);
     if (!deleted) {
       return res.status(404).json({ error: 'World not found' });
     }
@@ -258,6 +269,7 @@ app.delete('/api/worlds/:worldId', worldRateLimit, requireAuth(), async (req: an
     res.json({ success: true });
   } catch (error) {
     console.error('Failed to delete world:', error);
+    Sentry.captureException(error, { tags: { operation: 'delete_world' } });
     res.status(500).json({ error: 'Failed to delete world' });
   }
 });
@@ -286,6 +298,7 @@ app.post('/api/generate', wikiRateLimit, requireAuth(), async (req: any, res: an
     );
   } catch (error: any) {
     console.error('Express: Error:', error);
+    Sentry.captureException(error, { tags: { operation: 'generate_wiki' } });
     // Don't send JSON if we've already started streaming
     if (!res.headersSent) {
       res.status(error.status || 500).json({
@@ -327,6 +340,7 @@ app.post('/api/generate-section', wikiRateLimit, requireAuth(), async (req: any,
     );
   } catch (error: any) {
     console.error('Express: Section error:', error);
+    Sentry.captureException(error, { tags: { operation: 'generate_section' } });
     if (error.status) {
       res.status(error.status).json({
         error: error.error,
@@ -366,6 +380,7 @@ app.post('/api/generate-image', imageRateLimit, requireAuth(), async (req: any, 
     );
   } catch (error: any) {
     console.error('Express: Image generation error:', error);
+    Sentry.captureException(error, { tags: { operation: 'generate_image_express' } });
     if (error.status) {
       res.status(error.status).json({
         error: error.error,
@@ -380,10 +395,31 @@ app.post('/api/generate-image', imageRateLimit, requireAuth(), async (req: any, 
   }
 });
 
+// Test endpoint for RLS integration (development only)
+app.get('/api/test-rls', requireAuth(), async (req: any, res: any) => {
+  const userId = req.auth?.userId;
+  if (!userId) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  try {
+    const testResults = await testRLSIntegration(userId);
+    res.json({
+      userId,
+      testResults,
+      message: 'RLS integration test completed'
+    });
+  } catch (error) {
+    console.error('RLS test failed:', error);
+    res.status(500).json({
+      error: 'RLS test failed',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
 // Sentry error handling middleware (must be before other error handlers)
-if (process.env.NODE_ENV === 'production' && process.env.SENTRY_DSN) {
-  app.use(Sentry.Handlers.errorHandler());
-}
+// Note: In Sentry v8, error handling is automatic with captureException
 
 // Global error handler
 app.use((err: any, _req: any, res: any, _next: any) => {
