@@ -1,16 +1,34 @@
 import express from 'express';
 import cors from 'cors';
 import bodyParser from 'body-parser';
+import helmet from 'helmet';
 import dotenv from 'dotenv';
+import * as Sentry from '@sentry/node';
 import { clerkMiddleware, requireAuth } from '@clerk/express';
 import { createRateLimitMiddleware } from './utils/rateLimitMiddleware.js';
 
 // Load environment variables from .env.local
 dotenv.config({ path: '.env.local' });
 
+// Initialize Sentry (only in production)
+if (process.env.NODE_ENV === 'production' && process.env.SENTRY_DSN) {
+  Sentry.init({
+    dsn: process.env.SENTRY_DSN,
+    environment: process.env.NODE_ENV || 'production',
+    tracesSampleRate: 0.1, // 10% of transactions for performance monitoring
+    beforeSend(event) {
+      // Don't send API key validation errors to reduce noise
+      if (event.exception?.values?.[0]?.value?.includes('API key')) {
+        return null;
+      }
+      return event;
+    }
+  });
+}
+
 // Import these AFTER loading environment variables
-import { handleGenerate, handleGenerateSection, handleImageGeneration } from './shared-handlers.js';
-import { storeApiKey, getApiKey, removeApiKey, hasApiKey } from './utils/apiKeyVault.js';
+import { handleGenerate, handleGenerateSection, handleImageGeneration, handleStoreApiKey } from './shared-handlers.js';
+import { hasApiKey } from './utils/apiKeyVault.js';
 import { listWorlds, saveWorld, getWorld, deleteWorld } from './utils/worlds.js';
 import { getFreeLimit } from './utils/shared.js';
 import { getUsageForUser } from './utils/quota.js';
@@ -20,7 +38,32 @@ import { getUsageForUser } from './utils/quota.js';
 const app = express();
 const port = process.env.PORT || 3001;
 
+// Add Sentry request handler middleware
+if (process.env.NODE_ENV === 'production' && process.env.SENTRY_DSN) {
+  app.use(Sentry.Handlers.requestHandler());
+}
+
+// Add security headers
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      scriptSrc: ["'self'", "https://clerk.com"],
+      imgSrc: ["'self'", "data:", "https:", "blob:"],
+      connectSrc: ["'self'", "https://api.openai.com", "https://clerk.com"],
+      fontSrc: ["'self'", "https:"],
+      objectSrc: ["'none'"],
+      mediaSrc: ["'self'"],
+      frameSrc: ["'none'"]
+    }
+  },
+  crossOriginEmbedderPolicy: false // Disable COEP for compatibility
+}));
+
 app.use(cors({
+  origin: process.env.ALLOWED_ORIGINS?.split(',') || ['http://localhost:5173', 'http://localhost:3000'],
+  credentials: true,
   exposedHeaders: ['x-streaming']
 }));
 app.use(bodyParser.json());
@@ -100,45 +143,45 @@ app.get('/api/usage', globalRateLimit, requireAuth(), async (req: any, res: any)
   }
 });
 
-// API key storage endpoint (no validation for now)
+// API key storage endpoints using shared handler
 app.get('/api/store-key', apiKeyRateLimit, requireAuth(), async (req: any, res: any) => {
-  const userId = req.auth?.userId;
-  if (!userId) {
-    return res.status(401).json({ error: 'Unauthorized' });
+  try {
+    const result = await handleStoreApiKey('GET', undefined, req.auth?.userId);
+    res.json(result);
+  } catch (error: any) {
+    console.error('Store key GET error:', error);
+    res.status(error.status || 500).json({
+      error: error.error || 'Internal Server Error',
+      message: error.message || 'An unexpected error occurred'
+    });
   }
-
-  const hasKey = await hasApiKey(userId);
-  res.json({ hasKey });
 });
 
 app.post('/api/store-key', apiKeyRateLimit, requireAuth(), async (req: any, res: any) => {
-  const userId = req.auth?.userId;
-  if (!userId) {
-    return res.status(401).json({ error: 'Unauthorized' });
+  try {
+    const { apiKey } = req.body;
+    const result = await handleStoreApiKey('POST', apiKey, req.auth?.userId);
+    res.json(result);
+  } catch (error: any) {
+    console.error('Store key POST error:', error);
+    res.status(error.status || 500).json({
+      error: error.error || 'Internal Server Error',
+      message: error.message || 'An unexpected error occurred'
+    });
   }
-
-  const { apiKey } = req.body;
-
-  if (!apiKey || !apiKey.startsWith('sk-')) {
-    return res.status(400).json({ error: 'Invalid API key format' });
-  }
-
-  await storeApiKey(userId, apiKey);
-
-  res.json({
-    success: true,
-    message: 'API key stored securely'
-  });
 });
 
 app.delete('/api/store-key', apiKeyRateLimit, requireAuth(), async (req: any, res: any) => {
-  const userId = req.auth?.userId;
-  if (!userId) {
-    return res.status(401).json({ error: 'Unauthorized' });
+  try {
+    const result = await handleStoreApiKey('DELETE', undefined, req.auth?.userId);
+    res.json(result);
+  } catch (error: any) {
+    console.error('Store key DELETE error:', error);
+    res.status(error.status || 500).json({
+      error: error.error || 'Internal Server Error',
+      message: error.message || 'An unexpected error occurred'
+    });
   }
-
-  await removeApiKey(userId);
-  res.json({ success: true });
 });
 
 app.get('/api/worlds', worldRateLimit, requireAuth(), async (req: any, res: any) => {
@@ -337,6 +380,25 @@ app.post('/api/generate-image', imageRateLimit, requireAuth(), async (req: any, 
   }
 });
 
+// Sentry error handling middleware (must be before other error handlers)
+if (process.env.NODE_ENV === 'production' && process.env.SENTRY_DSN) {
+  app.use(Sentry.Handlers.errorHandler());
+}
+
+// Global error handler
+app.use((err: any, _req: any, res: any, _next: any) => {
+  console.error('Unhandled error:', err);
+
+  // Don't expose stack traces in production
+  const isDev = process.env.NODE_ENV !== 'production';
+  const errorMessage = isDev ? err.message : 'Internal Server Error';
+
+  res.status(err.status || 500).json({
+    error: 'Server Error',
+    message: errorMessage,
+    ...(isDev && { stack: err.stack })
+  });
+});
 
 app.listen(port, () => {
   console.log(`Server is running on http://localhost:${port}`);

@@ -22,6 +22,148 @@ import {
   hasApiKey
 } from './utils/apiKeyVault.js';
 
+// Input validation schemas
+const generateSchema = z.object({
+  input: z.string().min(1, 'Input is required').max(5000, 'Input too long (max 5000 characters)'),
+  type: z.enum(['seed', 'term'], { required_error: 'Type must be either "seed" or "term"' }),
+  context: z.string().max(10000, 'Context too long (max 10000 characters)').optional(),
+  worldbuildingHistory: z.record(z.any()).optional()
+});
+
+const generateSectionSchema = z.object({
+  sectionTitle: z.string().min(1, 'Section title is required').max(200, 'Section title too long (max 200 characters)'),
+  pageTitle: z.string().min(1, 'Page title is required').max(200, 'Page title too long (max 200 characters)'),
+  pageContent: z.string().min(1, 'Page content is required').max(50000, 'Page content too long (max 50000 characters)'),
+  worldbuildingHistory: z.record(z.any()).optional()
+});
+
+const imageGenerationSchema = z.object({
+  pageTitle: z.string().min(1, 'Page title is required').max(200, 'Page title too long (max 200 characters)'),
+  pageContent: z.string().min(1, 'Page content is required').max(10000, 'Page content too long for image generation (max 10000 characters)'),
+  worldbuildingHistory: z.record(z.any()).optional(),
+  worldId: z.string().optional(),
+  pageId: z.string().optional()
+});
+
+const apiKeySchema = z.object({
+  apiKey: z.string().min(1, 'API key is required').regex(/^sk-[a-zA-Z0-9]{48,}$/, 'Invalid OpenAI API key format')
+});
+
+// Helper function to validate and sanitize inputs
+export function validateGenerateInput(data: any) {
+  try {
+    return generateSchema.parse(data);
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      const firstError = error.errors[0];
+      throw {
+        status: 400,
+        error: 'Validation Error',
+        message: firstError.message,
+        field: firstError.path.join('.')
+      };
+    }
+    throw error;
+  }
+}
+
+export function validateGenerateSectionInput(data: any) {
+  try {
+    return generateSectionSchema.parse(data);
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      const firstError = error.errors[0];
+      throw {
+        status: 400,
+        error: 'Validation Error',
+        message: firstError.message,
+        field: firstError.path.join('.')
+      };
+    }
+    throw error;
+  }
+}
+
+export function validateImageGenerationInput(data: any) {
+  try {
+    return imageGenerationSchema.parse(data);
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      const firstError = error.errors[0];
+      throw {
+        status: 400,
+        error: 'Validation Error',
+        message: firstError.message,
+        field: firstError.path.join('.')
+      };
+    }
+    throw error;
+  }
+}
+
+export function validateApiKey(data: any) {
+  try {
+    return apiKeySchema.parse(data);
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      const firstError = error.errors[0];
+      throw {
+        status: 400,
+        error: 'Validation Error',
+        message: firstError.message,
+        field: firstError.path.join('.')
+      };
+    }
+    throw error;
+  }
+}
+
+export async function handleStoreApiKey(
+  method: string,
+  apiKey?: string,
+  userId?: string
+) {
+  if (!userId) {
+    throw {
+      status: 401,
+      error: 'Unauthorized',
+      message: 'Authentication required'
+    };
+  }
+
+  if (method === 'GET') {
+    const hasKey = await hasApiKey(userId);
+    return { hasKey };
+  }
+
+  if (method === 'POST') {
+    if (!apiKey) {
+      throw {
+        status: 400,
+        error: 'Validation Error',
+        message: 'API key is required'
+      };
+    }
+
+    // Validate API key format
+    const validatedInput = validateApiKey({ apiKey });
+
+    await storeApiKey(userId, validatedInput.apiKey);
+    return { success: true, message: 'API key stored securely' };
+  }
+
+  if (method === 'DELETE') {
+    await removeApiKey(userId);
+    return { success: true };
+  }
+
+  throw {
+    status: 405,
+    error: 'Method Not Allowed',
+    message: 'Only GET, POST, and DELETE methods are supported'
+  };
+}
+
 // Helper function to generate structured metadata
 export async function generateMetadata(
   input: string,
@@ -146,6 +288,13 @@ export async function handleGenerate(
   writeData?: (data: string) => void,
   endResponse?: () => void
 ) {
+  // Validate input
+  const validatedInput = validateGenerateInput({
+    input,
+    type,
+    context,
+    worldbuildingHistory
+  });
   const title = capitalizeTitle(
     type === 'seed' ?
       input.split(' ').slice(0, 5).join(' ').replace(/[.,!?]$/, '') :
@@ -357,6 +506,13 @@ export async function handleGenerateSection(
   writeData?: (data: string) => void,
   endResponse?: () => void
 ) {
+  // Validate input
+  const validatedInput = validateGenerateSectionInput({
+    sectionTitle,
+    pageTitle,
+    pageContent,
+    worldbuildingHistory
+  });
   const capitalizedSectionTitle = capitalizeTitle(sectionTitle);
 
   // Use API key from session if user API keys are enabled, otherwise use environment variable
@@ -485,6 +641,14 @@ export async function handleImageGeneration(
   worldId?: string,
   pageId?: string
 ) {
+  // Validate input
+  const validatedInput = validateImageGenerationInput({
+    pageTitle,
+    pageContent,
+    worldbuildingHistory,
+    worldId,
+    pageId
+  });
   // Use API key from session if user API keys are enabled, otherwise use environment variable
   const enableUserApiKeys = process.env.ENABLE_USER_API_KEYS === 'true';
   const userApiKey = (enableUserApiKeys && userId) ? await getApiKey(userId) : null;
