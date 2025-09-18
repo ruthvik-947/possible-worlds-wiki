@@ -30,7 +30,7 @@ if (process.env.NODE_ENV === 'production' && process.env.SENTRY_DSN) {
 // Import these AFTER loading environment variables
 import { handleGenerate, handleGenerateSection, handleImageGeneration, handleStoreApiKey } from './shared-handlers.js';
 import { hasApiKey } from './utils/apiKeyVault.js';
-import { listWorlds, saveWorld, getWorld, deleteWorld } from './utils/worlds.js';
+// Removed: Using worldsAuth.ts functions instead
 import { listWorldsAuth, saveWorldAuth, getWorldAuth, deleteWorldAuth, testRLSIntegration } from './utils/worldsAuth.js';
 import { getFreeLimit } from './utils/shared.js';
 import { getUsageForUser } from './utils/quota.js';
@@ -77,27 +77,27 @@ app.use(clerkMiddleware());
 // Rate limiting middleware definitions
 const wikiRateLimit = createRateLimitMiddleware({
   operationType: 'wikiGeneration',
-  getUserId: (req) => req.auth?.userId
+  getUserId: (req) => req.auth()?.userId
 });
 
 const imageRateLimit = createRateLimitMiddleware({
   operationType: 'imageGeneration',
-  getUserId: (req) => req.auth?.userId
+  getUserId: (req) => req.auth()?.userId
 });
 
 const worldRateLimit = createRateLimitMiddleware({
   operationType: 'worldOperations',
-  getUserId: (req) => req.auth?.userId
+  getUserId: (req) => req.auth()?.userId
 });
 
 const apiKeyRateLimit = createRateLimitMiddleware({
   operationType: 'apiKeyOperations',
-  getUserId: (req) => req.auth?.userId
+  getUserId: (req) => req.auth()?.userId
 });
 
 const globalRateLimit = createRateLimitMiddleware({
   operationType: 'global',
-  getUserId: (req) => req.auth?.userId
+  getUserId: (req) => req.auth()?.userId
 });
 
 // Check if user API keys are enabled
@@ -109,7 +109,7 @@ app.get('/api/config', globalRateLimit, requireAuth(), (req: any, res: any) => {
 
 // Usage endpoint - get current usage for user
 app.get('/api/usage', globalRateLimit, requireAuth(), async (req: any, res: any) => {
-  const userId = req.auth?.userId;
+  const userId = req.auth()?.userId;
   if (!userId) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
@@ -147,7 +147,7 @@ app.get('/api/usage', globalRateLimit, requireAuth(), async (req: any, res: any)
 // API key storage endpoints using shared handler
 app.get('/api/store-key', apiKeyRateLimit, requireAuth(), async (req: any, res: any) => {
   try {
-    const result = await handleStoreApiKey('GET', undefined, req.auth?.userId);
+    const result = await handleStoreApiKey('GET', undefined, req.auth()?.userId);
     res.json(result);
   } catch (error: any) {
     console.error('Store key GET error:', error);
@@ -162,7 +162,7 @@ app.get('/api/store-key', apiKeyRateLimit, requireAuth(), async (req: any, res: 
 app.post('/api/store-key', apiKeyRateLimit, requireAuth(), async (req: any, res: any) => {
   try {
     const { apiKey } = req.body;
-    const result = await handleStoreApiKey('POST', apiKey, req.auth?.userId);
+    const result = await handleStoreApiKey('POST', apiKey, req.auth()?.userId);
     res.json(result);
   } catch (error: any) {
     console.error('Store key POST error:', error);
@@ -176,7 +176,7 @@ app.post('/api/store-key', apiKeyRateLimit, requireAuth(), async (req: any, res:
 
 app.delete('/api/store-key', apiKeyRateLimit, requireAuth(), async (req: any, res: any) => {
   try {
-    const result = await handleStoreApiKey('DELETE', undefined, req.auth?.userId);
+    const result = await handleStoreApiKey('DELETE', undefined, req.auth()?.userId);
     res.json(result);
   } catch (error: any) {
     console.error('Store key DELETE error:', error);
@@ -189,7 +189,7 @@ app.delete('/api/store-key', apiKeyRateLimit, requireAuth(), async (req: any, re
 });
 
 app.get('/api/worlds', worldRateLimit, requireAuth(), async (req: any, res: any) => {
-  const userId = req.auth?.userId;
+  const userId = req.auth()?.userId;
   if (!userId) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
@@ -206,7 +206,7 @@ app.get('/api/worlds', worldRateLimit, requireAuth(), async (req: any, res: any)
 });
 
 app.get('/api/worlds/:worldId', worldRateLimit, requireAuth(), async (req: any, res: any) => {
-  const userId = req.auth?.userId;
+  const userId = req.auth()?.userId;
   if (!userId) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
@@ -229,7 +229,7 @@ app.get('/api/worlds/:worldId', worldRateLimit, requireAuth(), async (req: any, 
 });
 
 app.post('/api/worlds', worldRateLimit, requireAuth(), async (req: any, res: any) => {
-  const userId = req.auth?.userId;
+  const userId = req.auth()?.userId;
   if (!userId) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
@@ -252,7 +252,7 @@ app.post('/api/worlds', worldRateLimit, requireAuth(), async (req: any, res: any
 });
 
 app.delete('/api/worlds/:worldId', worldRateLimit, requireAuth(), async (req: any, res: any) => {
-  const userId = req.auth?.userId;
+  const userId = req.auth()?.userId;
   if (!userId) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
@@ -277,7 +277,7 @@ app.delete('/api/worlds/:worldId', worldRateLimit, requireAuth(), async (req: an
 app.post('/api/generate', wikiRateLimit, requireAuth(), async (req: any, res: any) => {
 
   const { input, type, context, worldbuildingHistory } = req.body;
-  const userId = req.auth?.userId;
+  const userId = req.auth()?.userId;
 
   // Set up streaming response headers
   res.setHeader('Content-Type', 'text/plain');
@@ -319,7 +319,7 @@ app.post('/api/generate', wikiRateLimit, requireAuth(), async (req: any, res: an
 app.post('/api/generate-section', wikiRateLimit, requireAuth(), async (req: any, res: any) => {
 
   const { sectionTitle, pageTitle, pageContent, worldbuildingHistory } = req.body;
-  const userId = req.auth?.userId;
+  const userId = req.auth()?.userId;
 
   // Set up streaming response headers
   res.setHeader('Content-Type', 'text/plain');
@@ -358,7 +358,7 @@ app.post('/api/generate-section', wikiRateLimit, requireAuth(), async (req: any,
 app.post('/api/generate-image', imageRateLimit, requireAuth(), async (req: any, res: any) => {
 
   const { pageTitle, pageContent, worldbuildingHistory, worldId, pageId } = req.body;
-  const userId = req.auth?.userId;
+  const userId = req.auth()?.userId;
 
   // Set up streaming response headers
   res.setHeader('Content-Type', 'text/plain');
@@ -397,7 +397,7 @@ app.post('/api/generate-image', imageRateLimit, requireAuth(), async (req: any, 
 
 // Test endpoint for RLS integration (development only)
 app.get('/api/test-rls', requireAuth(), async (req: any, res: any) => {
-  const userId = req.auth?.userId;
+  const userId = req.auth()?.userId;
   if (!userId) {
     return res.status(401).json({ error: 'Unauthorized' });
   }

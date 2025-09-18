@@ -1,4 +1,8 @@
 import { createClient } from '@supabase/supabase-js';
+import dotenv from 'dotenv';
+
+// Load environment variables from .env.local
+dotenv.config({ path: '.env.local' });
 
 // Initialize Supabase client with service role key for vault access
 const supabaseUrl = process.env.SUPABASE_URL;

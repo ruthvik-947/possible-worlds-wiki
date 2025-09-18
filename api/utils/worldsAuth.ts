@@ -58,7 +58,7 @@ function extractClerkToken(headers: IncomingHttpHeaders): string | null {
 }
 
 /**
- * Create an authenticated Supabase client using Clerk JWT
+ * Create an authenticated Supabase client using Clerk JWT (2025 method)
  */
 function createAuthenticatedClient(headers: IncomingHttpHeaders) {
   const token = extractClerkToken(headers);
@@ -67,13 +67,9 @@ function createAuthenticatedClient(headers: IncomingHttpHeaders) {
     throw new Error('No authentication token provided');
   }
 
-  // Create client with Clerk JWT for RLS authentication
+  // Use the 2025 third-party auth integration method
   return createClient(supabaseUrl, process.env.SUPABASE_ANON_KEY!, {
-    global: {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    },
+    accessToken: async () => token,
   });
 }
 
@@ -230,5 +226,4 @@ export async function testRLSIntegration(userId: string): Promise<any> {
   return data;
 }
 
-// Backward compatibility - export the original functions for gradual migration
-export { listWorlds, saveWorld, getWorld, deleteWorld } from './worlds.js';
+// Note: worlds.ts has been removed - using worldsAuth.ts exclusively now
