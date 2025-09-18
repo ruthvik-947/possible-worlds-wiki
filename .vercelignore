@@ -1,0 +1,14 @@
+# Exclude development-only files from Vercel deployment
+api/index.ts
+api/test-api-parity.ts
+
+# Test files
+**/*.test.ts
+**/*.test.js
+**/*.spec.ts
+**/*.spec.js
+
+# Development files
+.env.local
+.env
+*.log

@@ -5,7 +5,8 @@ import { withRateLimit } from './utils/rateLimitMiddleware.js';
 
 async function handleSectionRequest(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
+    res.status(405).json({ error: 'Method not allowed' });
+    return;
   }
 
   const { sectionTitle, pageTitle, pageContent, worldbuildingHistory } = req.body;
@@ -14,10 +15,11 @@ async function handleSectionRequest(req: VercelRequest, res: VercelResponse) {
   try {
     userId = await getUserIdFromHeaders(req.headers);
   } catch (error: any) {
-    return res.status(401).json({
+    res.status(401).json({
       error: 'Unauthorized',
       message: error?.message || 'Authentication required'
     });
+    return;
   }
 
   // Get client IP for rate limiting

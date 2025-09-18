@@ -43,15 +43,15 @@ const mapSummary = (row: any): WorldSummary => ({
 /**
  * Extract Clerk JWT token from request headers
  */
-function extractClerkToken(headers: IncomingHttpHeaders): string | null {
+function extractClerkToken(headers: IncomingHttpHeaders): string | undefined {
   const authHeader = headers.authorization || headers.Authorization;
   if (!authHeader || Array.isArray(authHeader)) {
-    return null;
+    return undefined;
   }
 
   const [scheme, token] = authHeader.split(' ');
   if (scheme !== 'Bearer' || !token) {
-    return null;
+    return undefined;
   }
 
   return token;
@@ -68,7 +68,17 @@ function createAuthenticatedClient(headers: IncomingHttpHeaders) {
   }
 
   // Use the 2025 third-party auth integration method
-  return createClient(supabaseUrl, process.env.SUPABASE_ANON_KEY!, {
+  const anonKey = process.env.SUPABASE_ANON_KEY;
+  if (!anonKey) {
+    throw new Error('SUPABASE_ANON_KEY is not configured');
+  }
+
+  if (!supabaseUrl) {
+    throw new Error('SUPABASE_URL is not configured');
+  }
+
+  // Token is guaranteed to be defined here after the check above
+  return createClient(supabaseUrl, anonKey, {
     accessToken: async () => token,
   });
 }
