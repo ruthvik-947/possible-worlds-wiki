@@ -1,7 +1,7 @@
 {
   "compilerOptions": {
     "target": "ES2020",
-    "module": "CommonJS",
+    "module": "ESNext",
     "lib": ["ES2020"],
     "skipLibCheck": true,
     "moduleResolution": "node",
@@ -12,15 +12,13 @@
     "forceConsistentCasingInFileNames": true,
     "allowSyntheticDefaultImports": true,
     "declaration": false,
-    "outDir": "./dist"
-  },
-  "tsx": {
-    "compilerOptions": {
-      "module": "CommonJS"
-    }
+    "outDir": "./dist",
+    "allowImportingTsExtensions": true,
+    "noEmit": true
   },
   "include": [
-    "api/**/*.ts"
+    "api/**/*.ts",
+    "lib/api-utils/**/*.ts"
   ],
   "exclude": [
     "node_modules"

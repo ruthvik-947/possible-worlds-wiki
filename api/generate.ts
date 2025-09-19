@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { handleGenerate } from './shared-handlers.js';
-import { getUserIdFromHeaders } from './utils/clerk.js';
-import { withRateLimit } from './utils/rateLimitMiddleware.js';
+import { handleGenerate } from '../lib/api-utils/shared-handlers.js';
+import { getUserIdFromHeaders } from '../lib/api-utils/clerk.js';
+import { withRateLimit } from '../lib/api-utils/rateLimitMiddleware.js';
 
 async function handleGenerateRequest(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {

@@ -5,7 +5,7 @@ import helmet from 'helmet';
 import dotenv from 'dotenv';
 import * as Sentry from '@sentry/node';
 import { clerkMiddleware, requireAuth } from '@clerk/express';
-import { createRateLimitMiddleware } from './utils/rateLimitMiddleware.js';
+import { createRateLimitMiddleware } from '../lib/api-utils/rateLimitMiddleware.js';
 
 // Load environment variables from .env.local
 dotenv.config({ path: '.env.local' });
@@ -28,12 +28,12 @@ if (process.env.NODE_ENV === 'production' && process.env.SENTRY_DSN) {
 }
 
 // Import these AFTER loading environment variables
-import { handleGenerate, handleGenerateSection, handleImageGeneration, handleStoreApiKey } from './shared-handlers.js';
-import { hasApiKey } from './utils/apiKeyVault.js';
+import { handleGenerate, handleGenerateSection, handleImageGeneration, handleStoreApiKey } from '../lib/api-utils/shared-handlers.js';
+import { hasApiKey } from '../lib/api-utils/apiKeyVault.js';
 // Removed: Using worldsAuth.ts functions instead
-import { listWorldsAuth, saveWorldAuth, getWorldAuth, deleteWorldAuth, testRLSIntegration } from './utils/worldsAuth.js';
-import { getFreeLimit } from './utils/shared.js';
-import { getUsageForUser } from './utils/quota.js';
+import { listWorldsAuth, saveWorldAuth, getWorldAuth, deleteWorldAuth, testRLSIntegration } from '../lib/api-utils/worldsAuth.js';
+import { getFreeLimit } from '../lib/api-utils/shared.js';
+import { getUsageForUser } from '../lib/api-utils/quota.js';
 
 // API key cleanup is now handled automatically by Supabase Vault TTL
 

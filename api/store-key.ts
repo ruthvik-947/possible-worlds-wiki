@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { getUserIdFromHeaders } from './utils/clerk.js';
-import { withRateLimit } from './utils/rateLimitMiddleware.js';
-import { handleStoreApiKey } from './shared-handlers.js';
+import { getUserIdFromHeaders } from '../lib/api-utils/clerk.js';
+import { withRateLimit } from '../lib/api-utils/rateLimitMiddleware.js';
+import { handleStoreApiKey } from '../lib/api-utils/shared-handlers.js';
 
 async function handleStoreKey(req: VercelRequest, res: VercelResponse) {
   try {

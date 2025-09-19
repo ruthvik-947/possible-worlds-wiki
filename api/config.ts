@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { getUserIdFromHeaders } from './utils/clerk.js';
+import { getUserIdFromHeaders } from '../lib/api-utils/clerk.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'GET') {

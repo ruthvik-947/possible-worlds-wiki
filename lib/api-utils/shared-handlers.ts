@@ -8,20 +8,20 @@ import {
   getWorldbuildingContext,
   capitalizeTitle,
   getFreeLimit
-} from './utils/shared.js';
-import { uploadImageToBlob } from './utils/imageStorage.js';
+} from './shared.js';
+import { uploadImageToBlob } from './imageStorage.js';
 import {
   getUsageForUser,
   incrementUsageForUser,
   hasExceededUserLimit
-} from './utils/quota.js';
+} from './quota.js';
 // Import the vault-based storage (which has fallback to in-memory)
 import {
   storeApiKey,
   getApiKey,
   removeApiKey,
   hasApiKey
-} from './utils/apiKeyVault.js';
+} from './apiKeyVault.js';
 
 // Input validation schemas
 const generateSchema = z.object({
