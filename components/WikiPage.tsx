@@ -192,6 +192,15 @@ export function WikiPage({ page, onTermClick, worldbuildingHistory, enableUserAp
   const handleAddSection = async () => {
     if (!newSectionTitle.trim()) return;
 
+    // Check if we've reached the section limit (5 sections per page)
+    if (sections.length >= 5) {
+      toast.error('Section limit reached', {
+        description: 'Each page is limited to a maximum of 5 sections.',
+        duration: 5000
+      });
+      return;
+    }
+
     setIsGenerating(true);
 
     let authToken: string;
@@ -358,13 +367,19 @@ export function WikiPage({ page, onTermClick, worldbuildingHistory, enableUserAp
           {/* Add Section Interface */}
           <div className="mb-16 border-t border-glass-divider pt-8">
             {!isAddingSection ? (
-              <button
-                onClick={() => setIsAddingSection(true)}
-                className="flex items-center space-x-2 text-glass-accent hover:text-glass-accent/80 font-medium transition-colors"
-              >
-                <Plus className="h-4 w-4" />
-                <span>Add Section</span>
-              </button>
+              sections.length < 5 ? (
+                <button
+                  onClick={() => setIsAddingSection(true)}
+                  className="flex items-center space-x-2 text-glass-accent hover:text-glass-accent/80 font-medium transition-colors"
+                >
+                  <Plus className="h-4 w-4" />
+                  <span>Add Section</span>
+                </button>
+              ) : (
+                <div className="text-glass-sidebar text-sm">
+                  Section limit reached (5 sections maximum per page)
+                </div>
+              )
             ) : (
               <div className="glass-panel p-6 rounded-lg">
                 <div className="space-y-4">

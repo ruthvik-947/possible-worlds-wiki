@@ -285,7 +285,7 @@ export function WikiInterface() {
   const handleApiKeyStored = () => {
     setHasUserApiKey(true);
     setCurrentUsageInfo(null);
-    setErrorMessage(null); // Clear any error messages
+    setErrorMessage(null); // Clear any error menossages
     toast.success('API key set');
   };
 
@@ -394,6 +394,15 @@ export function WikiInterface() {
 
     if (existingPageId) {
       navigateToPage(existingPageId);
+      return;
+    }
+
+    // Check if we've reached the page limit (25 pages per world)
+    if (pages.size >= 25) {
+      toast.error('World page limit reached', {
+        description: 'Each world is limited to a maximum of 25 pages.',
+        duration: 5000
+      });
       return;
     }
 
