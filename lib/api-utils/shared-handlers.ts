@@ -166,6 +166,9 @@ export async function handleStoreApiKey(
 }
 
 // Helper function to generate structured metadata
+// Shared system prompt for consistency and token savings
+const WORLDBUILDING_SYSTEM = `You are a creative worldbuilding agent with deep knowledge of history, mythology, cosmology, philosophy, science, and anthropology from diverse cultures. You have a Borgesian and Pratchett-like imagination with von-Neumann-esque sense for order.`;
+
 export async function generateMetadata(
   input: string,
   type: 'seed' | 'term',
@@ -224,18 +227,15 @@ export async function generateMetadata(
       },
       async () => generateObject({
       model: model,
-      system: `You are a worldbuilding agent. You are deeply knowledgeable about history, mythology, cosmology, philosophy, science, and anthropology from around the world (not only the West), and have a Borgesian, and Pratchett-like imagination and a von-Neumann-esque sense of order.`,
-      prompt: `Generate structured metadata for a wiki page in a possible universe about "${title}".
+      system: WORLDBUILDING_SYSTEM,
+      prompt: `Generate structured metadata for a wiki page in a possible universe about "${title}". Be creative and interesting, but not overbearing.
+Input: "${input}" (${type})${context ? `\nContext: "${context.substring(0, 200)}..."` : ''}${worldbuildingHistory ? `\nWorld context: ${getWorldbuildingContext(worldbuildingHistory)}` : ''}
 
-      The user has provided: "${input}"
-      This is a ${type === 'seed' ? 'seed sentence to start the wiki' : `term to expand upon`}.
-      ${context ? `The context for this term is: "${context}"` : ''}
-      ${worldbuildingHistory ? `Existing worldbuilding context: "${getWorldbuildingContext(worldbuildingHistory)}"` : ''}
-
-      For categories, choose 2-4 from: ${allCategories.join(', ')}
-      For clickableTerms, list 5-8 specific nouns/concepts that would be interesting to explore.
-      For relatedConcepts, list 2-4 related topics not directly mentioned.
-      For basicFacts, list 3-4 key facts about the topic (e.g., year, location, population, and appropriate attributes like these). Follow the format: name | value`,
+Provide:
+- 2-4 categories from: ${allCategories.join(', ')}
+- 5-8 clickableTerms (specific, interesting nouns/concepts)
+- 2-4 relatedConcepts with descriptions
+- 3-4 basicFacts (name|value format, e.g., year|3140AD, location|Eastern China)`,
       schema: metadataSchema
     }));
 
@@ -428,22 +428,16 @@ The formation process remains largely mysterious, though most agree it occurs on
       },
       async () => streamText({
       model: contentModel,
-      prompt: `You are a worldbuilding agent. You are deeply knowledgeable about history, mythology, cosmology, philosophy, science, and anthropology from around the world (not only the West), and have a Borgesian, and Pratchett-like imagination and a von-Neumann-esque sense of order. Generate a wiki page for a topic within a possible universe. Do not imply that this universe is fictional! To you and the user it is real.
+      system: WORLDBUILDING_SYSTEM,
+      prompt: `Generate a wiki article about "${title}" in a possible universe. Do not imply that the universe is fictional.
 
-      The user has provided the following input: "${input}"
-      This is a ${type === 'seed' ? 'seed sentence to start the wiki' : `term to expand upon`}.
-      ${context ? `The context for this term is: "${context}"` : ''}
-      ${worldbuildingHistory ? `Existing worldbuilding context: "${getWorldbuildingContext(worldbuildingHistory)}"` : ''}
+Input: "${input}" (${type})${context ? `\nContext: ${context.substring(0, 200)}` : ''}${worldbuildingHistory ? `\nWorld: ${getWorldbuildingContext(worldbuildingHistory)}` : ''}
 
-      You must write about "${title}" and incorporate these structured elements naturally:
-      - Categories: ${metadata.categories.join(', ')}
-      - Key terms to mention: ${metadata.clickableTerms.join(', ')}
-      - Related concepts: ${metadata.relatedConcepts.map(c => c.term).join(', ')}
-      - Important facts: ${metadata.basicFacts.map(f => `${f.name}: ${f.value}`).join(', ')}
+Naturally incorporate:
+- Terms: ${metadata.clickableTerms.slice(0, 6).join(', ')}
+- Facts: ${metadata.basicFacts.slice(0, 3).map(f => `${f.name}:${f.value}`).join(', ')}
 
-      Write a detailed and engaging encyclopedic article about "${title}". Write 3-4 paragraphs of rich, descriptive content that brings this topic to life. Be matter-of-fact and authoritative, no matter how fantastical the subject. ${worldbuildingHistory ? 'Ensure consistency with the existing worldbuilding context provided.' : ''}
-
-      Write ONLY the article content. Do not include the title, headers, markdown-formatting, or any JSON metadata. Start directly with the first paragraph of content.`
+Write a detailed and engaging encyclopedic article, with 3-4 paragraphs. Be authoritative and matter-of-fact, no matter how fantastical the subject. Ensure consistency with the existing worldbuilding context provided. Output only article content, no formatting.`
     }));
 
 
@@ -579,21 +573,12 @@ export async function handleGenerateSection(
     },
     async () => streamText({
     model: model,
-    prompt: `You are a creative worldbuilding assistant. Generate content for a new section of a wiki page.
+    system: 'Generate concise wiki section content.',
+    prompt: `Page: "${pageTitle}"
+Context: ${pageContent.substring(0, 500)}...
+Section: "${capitalizedSectionTitle}"${worldbuildingHistory ? `\nWorld: ${getWorldbuildingContext(worldbuildingHistory)}` : ''}
 
-    The main page is titled: "${pageTitle}"
-    The main page content is: "${pageContent}"
-    The new section title is: "${capitalizedSectionTitle}"
-    ${worldbuildingHistory ? `Existing worldbuilding context: "${getWorldbuildingContext(worldbuildingHistory)}"` : ''}
-
-    Generate a single paragraph of content for the section "${capitalizedSectionTitle}". The content should:
-    - Be written in an encyclopedic tone that matches the main page
-    - Be 2-3 sentences long
-    - Be relevant to the section title
-    - Maintain consistency with the main page content and any existing worldbuilding context
-    - Not track real world entities or concepts much
-
-    Write only the paragraph content. Do not include any labels, section headers, or markdown formatting.`
+Write 2-3 encyclopedic sentences for this section. Match the page tone. Output only content.`
   }));
 
   let accumulatedText = '';
@@ -719,7 +704,7 @@ export async function handleImageGeneration(
 
   try {
     // Create a concise image prompt based on the page content
-    const imagePrompt = `A minimalist, stylized illustration of ${pageTitle}. ${pageContent.split('.')[0]}. Simple, clean art style with muted colors, suitable for a wiki encyclopedia entry. Not photorealistic, more like a conceptual diagram or artistic interpretation.`;
+    const imagePrompt = `Minimalist wiki illustration of ${pageTitle}. ${pageContent.split('.')[0].substring(0, 100)}. Clean conceptual diagram or artistic interpretation style, muted colors.`;
 
     if (writeData) {
       writeData('data: ' + JSON.stringify({

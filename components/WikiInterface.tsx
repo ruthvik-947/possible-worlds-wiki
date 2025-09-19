@@ -3,10 +3,18 @@ import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
-import { Loader, Upload, Menu, Sun, Moon, Settings, LogOut, Search, Share } from 'lucide-react';
+import { Loader, Upload, Menu, Sun, Moon, Settings, LogOut, Search, Share, Key, Info } from 'lucide-react';
 import { WikiPage } from './WikiPage';
 import { generateWikiPage, WikiPageData } from './WikiGenerator';
 import { ApiKeyDialog } from './ApiKeyDialog';
+import { About } from './About';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from './ui/dropdown-menu';
 import { UsageIndicator } from './UsageIndicator';
 import {
   WorldbuildingRecord,
@@ -46,6 +54,7 @@ export function WikiInterface() {
   const [isStreaming, setIsStreaming] = useState<boolean>(false);
   const [isApiDialogOpen, setIsApiDialogOpen] = useState<boolean>(false);
   const [autoSaveInfo, setAutoSaveInfo] = useState<AutoSaveInfo>({ status: 'idle' });
+  const [showAbout, setShowAbout] = useState<boolean>(false);
   const { isLoaded: isAuthLoaded, isSignedIn, getToken } = useAuth();
   const autoSaveTimeoutRef = useRef<number | null>(null);
   const latestWorldRef = useRef<World>(currentWorld);
@@ -665,6 +674,11 @@ export function WikiInterface() {
     );
   };
 
+  // Show About page if requested
+  if (showAbout) {
+    return <About onBack={() => setShowAbout(false)} />;
+  }
+
   return (
     <div className="min-h-screen bg-glass-bg">
       {/* Fixed Top Navigation - Glass Minimalism Style */}
@@ -716,45 +730,46 @@ export function WikiInterface() {
 
           {/* Right Menu */}
           <div className="flex items-center space-x-2">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={toggleDarkMode}
-              className="text-glass-bg hover:bg-glass-bg/10 h-8 w-8 p-0"
-              title="Toggle theme"
-            >
-              {isDarkMode ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-            </Button>
-            {enableUserApiKeys && (
-              <ApiKeyDialog
-                hasApiKey={hasUserApiKey}
-                onStored={handleApiKeyStored}
-                onRemoved={handleApiKeyRemoved}
-                isLoading={isLoading}
-                open={isApiDialogOpen}
-                onOpenChange={setIsApiDialogOpen}
-                trigger={
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="text-glass-bg hover:bg-glass-bg/10 h-8 w-8 p-0"
-                    title="Settings"
-                  >
-                    <Settings className="h-4 w-4" />
-                  </Button>
-                }
-              />
-            )}
-            <SignOutButton signOutOptions={{ redirectUrl: '/' }}>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="text-glass-bg hover:bg-glass-bg/10 h-8 w-8 p-0"
-                title="Sign out"
-              >
-                <LogOut className="h-4 w-4" />
-              </Button>
-            </SignOutButton>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-glass-bg hover:bg-glass-bg/10 h-8 w-8 p-0"
+                  title="Settings"
+                >
+                  <Settings className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56 bg-white border border-gray-200 shadow-lg">
+                {enableUserApiKeys && (
+                  <>
+                    <DropdownMenuItem
+                      onClick={() => setIsApiDialogOpen(true)}
+                      className="cursor-pointer"
+                    >
+                      <Key className="mr-2 h-4 w-4" />
+                      {hasUserApiKey ? 'Manage API Key' : 'Set API Key'}
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                  </>
+                )}
+                <DropdownMenuItem
+                  onClick={() => setShowAbout(true)}
+                  className="cursor-pointer"
+                >
+                  <Info className="mr-2 h-4 w-4" />
+                  About
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <SignOutButton signOutOptions={{ redirectUrl: '/' }}>
+                  <DropdownMenuItem className="cursor-pointer">
+                    <LogOut className="mr-2 h-4 w-4" />
+                    Sign out
+                  </DropdownMenuItem>
+                </SignOutButton>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
       </nav>
@@ -837,6 +852,16 @@ export function WikiInterface() {
                   </div>
                 </CardContent>
               </Card>
+
+              {/* About link */}
+              <div className="text-center mt-8">
+                <button
+                  onClick={() => setShowAbout(true)}
+                  className="text-glass-sidebar hover:text-glass-accent text-sm transition-colors underline"
+                >
+                  About
+                </button>
+              </div>
             </div>
           </div>
         ) : (
@@ -1057,6 +1082,7 @@ export function WikiInterface() {
 
 
       <Toaster position="bottom-right" theme={isDarkMode ? 'dark' : 'light'} />
+
     </div>
   );
 }

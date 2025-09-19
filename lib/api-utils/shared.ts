@@ -20,18 +20,28 @@ export const worldbuildingCategories = {
 export const allCategories = [...worldbuildingCategories.mental, ...worldbuildingCategories.material, ...worldbuildingCategories.social];
 
 // Helper function to extract worldbuilding context from history
-export function getWorldbuildingContext(history: any): string {
+// Optimized to return only the most relevant recent context to save tokens
+export function getWorldbuildingContext(history: any, maxLength: number = 500): string {
   const contextParts = [];
-  
+
   for (const [group, categories] of Object.entries(history)) {
     for (const [category, entries] of Object.entries(categories as any)) {
       if ((entries as string[]).length > 0) {
-        contextParts.push(`${category}: ${(entries as string[]).join(', ')}`);
+        // Take only the last 3 entries from each category to keep context fresh and concise
+        const recentEntries = (entries as string[]).slice(-3);
+        contextParts.push(`${category}: ${recentEntries.join(', ')}`);
       }
     }
   }
-  
-  return contextParts.join('. ');
+
+  const fullContext = contextParts.join('. ');
+
+  // Truncate if context is too long
+  if (fullContext.length > maxLength) {
+    return fullContext.substring(0, maxLength) + '...';
+  }
+
+  return fullContext;
 }
 
 export function capitalizeTitle(title: string): string {
