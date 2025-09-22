@@ -11,15 +11,19 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `npm run lint` - Run ESLint
 - `npm run typecheck` - Run TypeScript type checking
 
-**Backend Development:**
+**Backend Development (Dual Server Architecture):**
 
-**Option 1: Express Development Server (Default)**
+This project maintains both Express and Vercel servers for flexibility:
+- **Express**: Faster startup, easier debugging, works offline
+- **Vercel Functions**: Production-like environment, tests edge cases
+
+**Option 1: Express Development Server (Recommended for Development)**
 ```bash
 npm run dev:api          # Start Express server on localhost:3001
 npm run dev              # Start frontend (will connect to localhost:3001)
 ```
 
-**Option 2: Vercel Development Server (Production-like)**
+**Option 2: Vercel Development Server (For Production Testing)**
 ```bash
 # First time setup:
 npx vercel login         # Authenticate with Vercel
@@ -83,6 +87,15 @@ All API endpoints use shared handlers from `api/shared-handlers.ts` to ensure id
   - `VITE_API_URL` - Frontend API base URL (auto-configured)
   - `OPENAI_API_KEY` - Server-side OpenAI key
   - `ENABLE_USER_API_KEYS` - Toggle for user-provided API key mode
+  - `VITE_SENTRY_DSN` - Sentry DSN for frontend error tracking
+  - `SENTRY_DSN` - Sentry DSN for backend error tracking
+
+### Error Monitoring (Sentry)
+- **Frontend**: Errors captured automatically in `main.tsx`
+- **Express Backend**: Errors captured in `api/index.ts` with operation tags
+- **Vercel Functions**: Errors captured in each function via `api/utils/sentry.ts`
+- **Configuration**: Uses `sendDefaultPii: true` to collect IP addresses and user context
+- All errors tagged with operation context for better debugging
 
 ### UI System
 - **Styling**: TailwindCSS with custom "Glass Minimalism" design system
