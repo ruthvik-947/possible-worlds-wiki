@@ -53,9 +53,14 @@ export function About({ onBack }: AboutProps) {
             </a>
             . <br></br>
             <br></br>
-              <a className="text-glass-accent hover:text-glass-accent/80 underline transition-colors" href="mailto:ruthvik@ladder-research.com">Message me</a> about this site, and check out {' '}
               <a
-              href="https://ruthvik.com"
+                className="text-glass-accent hover:text-glass-accent/80 underline transition-colors"
+                href="mailto:ruthvik@ladder-research.com?subject=About PossibleWorldWikis"
+              >
+                Message me
+              </a> about this site, and check out {' '}
+              <a
+              href="https://pond.ladder-research.com"
               target="_blank"
               rel="noopener noreferrer"
               className="text-glass-accent hover:text-glass-accent/80 underline transition-colors"

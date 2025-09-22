@@ -1,4 +1,4 @@
-iimport type { VercelRequest, VercelResponse } from '@vercel/node';
+import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { getUserIdFromHeadersSDK } from '../../lib/api-utils/clerk.js';
 import { withRateLimit } from '../../lib/api-utils/rateLimitMiddleware.js';
 import { getWorldAuth, deleteWorldAuth } from '../../lib/api-utils/worldsAuth.js';
