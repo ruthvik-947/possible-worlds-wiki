@@ -21,7 +21,7 @@ export default function App() {
               </h1> */}
               <SignIn
                 routing="hash"
-                afterSignInUrl="/"
+                fallbackRedirectUrl="/"
                 appearance={{
                   layout: {
                     logoPlacement: 'none',

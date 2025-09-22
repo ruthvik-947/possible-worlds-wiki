@@ -9,7 +9,22 @@ initSentry();
 async function handleStoreKey(req: VercelRequest, res: VercelResponse) {
   try {
     const userId = await getUserIdFromHeadersSDK(req.headers);
-    const { apiKey } = req.body;
+
+    // Parse body if it's a string (common in Vercel functions)
+    let body = req.body;
+    if (typeof body === 'string') {
+      try {
+        body = JSON.parse(body);
+      } catch (parseError) {
+        throw new Error('Invalid JSON in request body');
+      }
+    }
+
+    if (!body || typeof body !== 'object') {
+      throw new Error('Request body is required');
+    }
+
+    const { apiKey } = body;
 
     const result = await handleStoreApiKey(req.method!, apiKey, userId);
     res.json(result);
