@@ -6,86 +6,96 @@ import { initSentry, Sentry } from '../lib/api-utils/sentry.js';
 
 initSentry();
 
-// Disable automatic body parsing - we'll do it manually
-export const config = {
-  api: {
-    bodyParser: false,
-  },
-};
-
 async function handleStoreKey(req: VercelRequest, res: VercelResponse) {
-  // Manual body parsing for Vercel functions
-  let rawBody = '';
-  let body: any = undefined;
-
-  // Only read body for POST/PUT/PATCH methods
-  if (req.method === 'POST' || req.method === 'PUT' || req.method === 'PATCH') {
-    try {
-      // Read the raw body
-      await new Promise<void>((resolve, reject) => {
-        req.on('data', (chunk) => {
-          rawBody += chunk.toString();
-        });
-        req.on('end', () => {
-          resolve();
-        });
-        req.on('error', reject);
-      });
-
-      // Parse JSON body if we got data
-      if (rawBody) {
-        try {
-          body = JSON.parse(rawBody);
-          console.log('Successfully parsed body:', body);
-        } catch (parseError) {
-          console.error('Failed to parse JSON from raw body:', parseError, 'Raw body:', rawBody);
-          throw new Error('Invalid JSON in request body');
-        }
-      }
-    } catch (error) {
-      console.error('Error reading request body:', error);
-      throw new Error('Failed to read request body');
-    }
-  }
-
-  // Enhanced logging for debugging
-  console.log('Store-key request details:', {
+  // Enhanced logging to debug what Vercel provides
+  console.log('Store-key request RAW details:', {
     method: req.method,
-    hasAuthHeader: !!req.headers.authorization,
-    authHeaderType: typeof req.headers.authorization,
-    authHeaderLength: req.headers.authorization?.length,
-    contentType: req.headers['content-type'],
-    rawBodyLength: rawBody.length,
-    parsedBody: body,
-    hasBody: !!body
+    url: req.url,
+    headers: {
+      contentType: req.headers['content-type'],
+      contentLength: req.headers['content-length'],
+      authorization: req.headers.authorization ? 'Bearer token present' : 'No auth header'
+    },
+    bodyType: typeof req.body,
+    bodyValue: req.body,
+    bodyStringified: JSON.stringify(req.body),
+    bodyKeys: req.body && typeof req.body === 'object' ? Object.keys(req.body) : 'not an object',
+    isBuffer: Buffer.isBuffer(req.body),
+    bodyConstructor: req.body?.constructor?.name,
+    // Check if body might be in other properties
+    reqKeys: Object.keys(req).filter(k => !['headers', 'url', 'method'].includes(k))
   });
 
   try {
     const userId = await getUserIdFromHeadersSDK(req.headers);
     console.log('Authentication successful, userId:', userId);
 
-    // For DELETE requests, body might be empty - that's okay
+    // For DELETE requests, body is not required
     if (req.method === 'DELETE') {
       const result = await handleStoreApiKey(req.method!, undefined, userId);
       res.json(result);
       return;
     }
 
-    // For POST requests, body is required
+    // For POST requests, handle different body formats
+    let body = req.body;
+
+    // If body is a Buffer, convert it to string and parse
+    if (Buffer.isBuffer(body)) {
+      console.log('Body is a Buffer, converting to string...');
+      const bodyString = body.toString('utf-8');
+      try {
+        body = JSON.parse(bodyString);
+        console.log('Parsed Buffer body:', body);
+      } catch (e) {
+        console.error('Failed to parse Buffer body:', e, 'Body string:', bodyString);
+        throw new Error('Invalid JSON in request body');
+      }
+    }
+    // If body is a string, parse it
+    else if (typeof body === 'string') {
+      console.log('Body is a string, parsing as JSON...');
+      try {
+        body = JSON.parse(body);
+        console.log('Parsed string body:', body);
+      } catch (e) {
+        console.error('Failed to parse string body:', e, 'Body string:', body);
+        throw new Error('Invalid JSON in request body');
+      }
+    }
+
+    // Check if body exists and is an object
     if (!body || typeof body !== 'object') {
       console.error('Missing or invalid body for POST request:', {
         body,
         bodyType: typeof body,
         method: req.method,
-        rawBodyLength: rawBody.length,
-        rawBodyPreview: rawBody.substring(0, 100)
+        headers: req.headers,
+        reqObjectKeys: Object.keys(req)
       });
+
+      // Send more detailed error to help debug
+      Sentry.captureException(new Error('Request body missing'), {
+        tags: { operation: 'store_key', errorType: 'missing_body' },
+        extra: {
+          method: req.method,
+          bodyType: typeof req.body,
+          bodyValue: req.body,
+          contentType: req.headers['content-type'],
+          contentLength: req.headers['content-length']
+        }
+      });
+
       throw new Error('Request body is required for POST requests');
     }
 
     const { apiKey } = body;
     if (!apiKey) {
-      console.error('Missing apiKey in body:', { body, bodyKeys: Object.keys(body) });
+      console.error('Missing apiKey in body:', {
+        body,
+        bodyKeys: Object.keys(body),
+        bodyStringified: JSON.stringify(body)
+      });
       throw new Error('apiKey field is required in request body');
     }
 
@@ -114,7 +124,11 @@ async function handleStoreKey(req: VercelRequest, res: VercelResponse) {
   }
 }
 
-export default withRateLimit(
-  { operationType: 'apiKeyOperations' },
-  handleStoreKey
-);
+// Temporarily bypass rate limit to debug body parsing issue
+// export default withRateLimit(
+//   { operationType: 'apiKeyOperations' },
+//   handleStoreKey
+// );
+
+// Direct export for debugging
+export default handleStoreKey;
