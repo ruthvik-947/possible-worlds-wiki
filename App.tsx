@@ -7,7 +7,7 @@ export default function App() {
       <header className="flex items-center justify-between px-6 py-4">
         {/* <span className="text-lg font-semibold">Procedural Wiki</span> */}
         <SignedIn>
-          <UserButton afterSignOutUrl="/" />
+          <UserButton afterSignOutUrl="/" /> 
         </SignedIn>
       </header>
 
@@ -21,7 +21,7 @@ export default function App() {
               </h1> */}
               <SignIn
                 routing="hash"
-                fallbackRedirectUrl="/"
+                fallbackRedirectUrl="/"r
                 appearance={{
                   layout: {
                     logoPlacement: 'none',
