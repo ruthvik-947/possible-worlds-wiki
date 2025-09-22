@@ -30,9 +30,16 @@ async function handleStoreKey(req: VercelRequest, res: VercelResponse) {
     const userId = await getUserIdFromHeadersSDK(req.headers);
     console.log('Authentication successful, userId:', userId);
 
-    // For DELETE requests, body is not required
+    // Handle GET requests - check if user has an API key
+    if (req.method === 'GET') {
+      const result = await handleStoreApiKey('GET', undefined, userId);
+      res.json(result);
+      return;
+    }
+
+    // Handle DELETE requests
     if (req.method === 'DELETE') {
-      const result = await handleStoreApiKey(req.method!, undefined, userId);
+      const result = await handleStoreApiKey('DELETE', undefined, userId);
       res.json(result);
       return;
     }
@@ -64,29 +71,32 @@ async function handleStoreKey(req: VercelRequest, res: VercelResponse) {
       }
     }
 
-    // Check if body exists and is an object
-    if (!body || typeof body !== 'object') {
-      console.error('Missing or invalid body for POST request:', {
-        body,
-        bodyType: typeof body,
-        method: req.method,
-        headers: req.headers,
-        reqObjectKeys: Object.keys(req)
-      });
-
-      // Send more detailed error to help debug
-      Sentry.captureException(new Error('Request body missing'), {
-        tags: { operation: 'store_key', errorType: 'missing_body' },
-        extra: {
+    // Only validate body for POST/PUT/PATCH requests
+    if (req.method === 'POST' || req.method === 'PUT' || req.method === 'PATCH') {
+      // Check if body exists and is an object
+      if (!body || typeof body !== 'object') {
+        console.error('Missing or invalid body for POST request:', {
+          body,
+          bodyType: typeof body,
           method: req.method,
-          bodyType: typeof req.body,
-          bodyValue: req.body,
-          contentType: req.headers['content-type'],
-          contentLength: req.headers['content-length']
-        }
-      });
+          headers: req.headers,
+          reqObjectKeys: Object.keys(req)
+        });
 
-      throw new Error('Request body is required for POST requests');
+        // Send more detailed error to help debug
+        Sentry.captureException(new Error('Request body missing'), {
+          tags: { operation: 'store_key', errorType: 'missing_body' },
+          extra: {
+            method: req.method,
+            bodyType: typeof req.body,
+            bodyValue: req.body,
+            contentType: req.headers['content-type'],
+            contentLength: req.headers['content-length']
+          }
+        });
+
+        throw new Error('Request body is required for POST requests');
+      }
     }
 
     const { apiKey } = body;
@@ -124,11 +134,7 @@ async function handleStoreKey(req: VercelRequest, res: VercelResponse) {
   }
 }
 
-// Temporarily bypass rate limit to debug body parsing issue
-// export default withRateLimit(
-//   { operationType: 'apiKeyOperations' },
-//   handleStoreKey
-// );
-
-// Direct export for debugging
-export default handleStoreKey;
+export default withRateLimit(
+  { operationType: 'apiKeyOperations' },
+  handleStoreKey
+);
