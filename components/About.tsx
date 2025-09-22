@@ -20,9 +20,12 @@ export function About({ onBack }: AboutProps) {
             >
               <ArrowLeft className="h-4 w-4" />
             </Button>
-            <span className="text-2xl font-serif font-medium text-glass-bg tracking-wide">
+            <button
+              onClick={onBack}
+              className="text-2xl font-serif font-medium text-glass-bg tracking-wide hover:text-glass-bg/80 transition-colors cursor-pointer"
+            >
               PWW
-            </span>
+            </button>
           </div>
         </div>
       </nav>
@@ -48,7 +51,17 @@ export function About({ onBack }: AboutProps) {
             >
               Ruthvik Peddawandla
             </a>
-            .
+            . <br></br>
+            <br></br>
+              <a className="text-glass-accent hover:text-glass-accent/80 underline transition-colors" href="mailto:ruthvik@ladder-research.com">Message me</a> about this site, and check out {' '}
+              <a
+              href="https://ruthvik.com"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-glass-accent hover:text-glass-accent/80 underline transition-colors"
+            >
+              Pond
+              </a>, my main project.
           </p>
         </div>
       </div>
