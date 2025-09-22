@@ -39,7 +39,7 @@ export function About({ onBack }: AboutProps) {
           </h2> */}
 
           <p className="text-base text-body leading-relaxed">
-            Made to embrace and make the most of LLM hallucinations, <br></br>by{' '}
+            Made to embrace LLM hallucinations, <br></br>by{' '}
             <a
               href="https://ruthvik.com"
               target="_blank"
