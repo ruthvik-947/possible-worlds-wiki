@@ -187,7 +187,7 @@ export async function generateMetadata(
 
   // For testing, return mock data if no API key
   if (!process.env.OPENAI_API_KEY) {
-    console.log('No API key available, returning mock metadata');
+    // console.log('No API key available, returning mock metadata');
     return {
       categories: ["Magic & Mysticism", "Supernatural Phenomena"],
       clickableTerms: ["crystal formation", "levitation field", "magical resonance", "astral energy", "floating stones"],

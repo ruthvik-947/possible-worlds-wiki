@@ -76,7 +76,6 @@ export async function generateWikiPage(
 
     // Handle streaming response
     const streamingHeader = response.headers.get('x-streaming');
-    console.log('All response headers:', Object.fromEntries(response.headers.entries()));
 
     if (streamingHeader === 'true') {
       const reader = response.body?.getReader();

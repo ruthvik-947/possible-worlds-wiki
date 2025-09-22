@@ -3,7 +3,7 @@ import { getFreeLimit } from '../lib/api-utils/shared.js';
 import { getUsageForUser } from '../lib/api-utils/quota.js';
 import { getUserIdFromHeadersSDK } from '../lib/api-utils/clerk.js';
 import { hasApiKey } from '../lib/api-utils/apiKeyVault.js';
-import { initSentry, Sentry } from './utils/sentry.js';
+import { initSentry, Sentry } from '../lib/api-utils/sentry.js';
 
 initSentry();
 

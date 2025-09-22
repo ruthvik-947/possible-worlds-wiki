@@ -15,7 +15,7 @@ const inMemoryKeys = new Map<string, { apiKey: string; timestamp: number }>();
 // Helper to get Supabase client
 function getSupabaseClient() {
   if (!supabaseUrl || !supabaseServiceKey) {
-    console.log('Supabase Vault not configured, using in-memory storage');
+    // console.log('Supabase Vault not configured, using in-memory storage');
     return null;
   }
 

@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { getUserIdFromHeadersSDK } from '../lib/api-utils/clerk.js';
-import { initSentry, Sentry } from './utils/sentry.js';
+import { initSentry, Sentry } from '../lib/api-utils/sentry.js';
 
 initSentry();
 

@@ -68,11 +68,12 @@ This is a **PossibleWorldWikis** application - an AI-powered interactive worldbu
   - `store-key.ts` - Handles temporary user API key storage
   - `index.ts` - Express server for development (mirrors Vercel functions)
 - **Shared Logic**:
-  - `api/shared-handlers.ts` - Common streaming logic used by both Express and Vercel
-  - `api/utils/shared.ts` - Common functions and worldbuilding categories
+  - `lib/api-utils/shared-handlers.ts` - Common streaming logic used by both Express and Vercel
+  - `lib/api-utils/shared.ts` - Common functions and worldbuilding categories
+  - `lib/api-utils/sentry.ts` - Centralized Sentry error tracking for Vercel functions
 
 **🎯 Architecture Principle: Single Source of Truth**
-All API endpoints use shared handlers from `api/shared-handlers.ts` to ensure identical behavior between development (Express) and production (Vercel) environments.
+All API endpoints use shared handlers from `lib/api-utils/shared-handlers.ts` to ensure identical behavior between development (Express) and production (Vercel) environments.
 
 ### Key Data Flow
 1. **Seed Creation**: User enters initial concept → generates first wiki page
@@ -93,7 +94,7 @@ All API endpoints use shared handlers from `api/shared-handlers.ts` to ensure id
 ### Error Monitoring (Sentry)
 - **Frontend**: Errors captured automatically in `main.tsx`
 - **Express Backend**: Errors captured in `api/index.ts` with operation tags
-- **Vercel Functions**: Errors captured in each function via `api/utils/sentry.ts`
+- **Vercel Functions**: Errors captured in each function via `lib/api-utils/sentry.ts`
 - **Configuration**: Uses `sendDefaultPii: true` to collect IP addresses and user context
 - All errors tagged with operation context for better debugging
 
@@ -109,11 +110,13 @@ The application generates coherent fictional worlds by maintaining context acros
 ### Preventing Dual Implementation Issues
 
 **✅ DO:**
-1. Always implement new endpoints in `api/shared-handlers.ts` first
+1. Always implement new endpoints in `lib/api-utils/shared-handlers.ts` first
 2. Call shared handlers from both Express (`api/index.ts`) and Vercel functions
 3. Run `npm run test:api-parity` before committing API changes
 4. Use `npm run dev:vercel` for development when testing production parity
 5. Keep streaming logic, error handling, and business logic in shared handlers
+6. **Place all API utilities in `lib/api-utils/`** (not in `api/` directory)
+7. **Always log errors to Sentry** with appropriate operation tags for debugging
 
 **❌ DON'T:**
 1. Copy-paste code between Express and Vercel functions
@@ -125,7 +128,7 @@ The application generates coherent fictional worlds by maintaining context acros
 
 When adding a new API endpoint:
 
-1. **Create shared handler** in `api/shared-handlers.ts`:
+1. **Create shared handler** in `lib/api-utils/shared-handlers.ts`:
    ```typescript
    export async function handleNewFeature(
      param1: string,
@@ -156,6 +159,10 @@ When adding a new API endpoint:
 
 3. **Create Vercel function** in `api/new-feature.ts`:
    ```typescript
+   import { initSentry, Sentry } from '../lib/api-utils/sentry.js';
+
+   initSentry();
+
    export default async function handler(req: VercelRequest, res: VercelResponse) {
      // Get client IP, set headers
      try {
@@ -166,6 +173,8 @@ When adding a new API endpoint:
          () => res.end()
        );
      } catch (error) {
+       console.error('New feature error:', error);
+       Sentry.captureException(error, { tags: { operation: 'new_feature' } });
        // Error handling
      }
    }
