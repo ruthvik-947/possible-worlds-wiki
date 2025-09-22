@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { getUserIdFromHeaders } from '../lib/api-utils/clerk.js';
+import { getUserIdFromHeadersSDK } from '../lib/api-utils/clerk.js';
 import { initSentry, Sentry } from './utils/sentry.js';
 
 initSentry();
@@ -10,9 +10,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    await getUserIdFromHeaders(req.headers);
+    await getUserIdFromHeadersSDK(req.headers);
   } catch (error: any) {
-    Sentry.captureException(error, { tags: { operation: 'config_auth' } });
+    // Log all authentication errors with detailed tags for early-stage monitoring
+    Sentry.captureException(error, {
+      tags: {
+        operation: 'config_auth',
+        errorType: 'authentication',
+        endpoint: 'config'
+      },
+      extra: {
+        errorMessage: error?.message,
+        hasAuthHeader: !!req.headers.authorization
+      }
+    });
     return res.status(401).json({
       error: 'Unauthorized',
       message: error?.message || 'Authentication required'

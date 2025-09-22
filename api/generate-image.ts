@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { handleImageGeneration } from '../lib/api-utils/shared-handlers.js';
-import { getUserIdFromHeaders } from '../lib/api-utils/clerk.js';
+import { getUserIdFromHeadersSDK } from '../lib/api-utils/clerk.js';
 import { withRateLimit } from '../lib/api-utils/rateLimitMiddleware.js';
 import { initSentry, Sentry } from './utils/sentry.js';
 
@@ -16,9 +16,20 @@ async function handleImageRequest(req: VercelRequest, res: VercelResponse) {
   let userId: string;
 
   try {
-    userId = await getUserIdFromHeaders(req.headers);
+    userId = await getUserIdFromHeadersSDK(req.headers);
   } catch (error: any) {
-    Sentry.captureException(error, { tags: { operation: 'generate_image_auth' } });
+    // Log all authentication errors with detailed tags for early-stage monitoring
+    Sentry.captureException(error, {
+      tags: {
+        operation: 'generate_image_auth',
+        errorType: 'authentication',
+        endpoint: 'generate-image'
+      },
+      extra: {
+        errorMessage: error?.message,
+        hasAuthHeader: !!req.headers.authorization
+      }
+    });
     res.status(401).json({
       error: 'Unauthorized',
       message: error?.message || 'Authentication required'
