@@ -1,7 +1,6 @@
 // Shared API handlers that work with both Express and Vercel
 import { streamText, generateObject, experimental_generateImage as generateImage } from 'ai';
 import { openai } from '@ai-sdk/openai';
-import * as Sentry from '@sentry/node';
 import { z } from 'zod';
 import {
   allCategories,
@@ -220,12 +219,7 @@ export async function generateMetadata(
   });
 
   try {
-    const result = await Sentry.startSpan(
-      {
-        op: "ai.generate",
-        name: "Generate Page Metadata",
-      },
-      async () => generateObject({
+    const result = await generateObject({
       model: model,
       system: WORLDBUILDING_SYSTEM,
       prompt: `Generate structured metadata for a wiki page in a possible universe about "${title}". Be creative and interesting, but not overbearing.
@@ -237,15 +231,11 @@ Provide:
 - 2-4 relatedConcepts with descriptions
 - 3-4 basicFacts (name|value format, e.g., year|3140AD, location|Eastern China)`,
       schema: metadataSchema
-    }));
+    });
 
     return parseMetadata(result.object);
   } catch (e) {
     console.error('Failed to generate metadata:', e);
-    Sentry.captureException(e, {
-      tags: { operation: 'metadata_generation' },
-      extra: { input, type, context }
-    });
     // Fallback to mock data if generation fails
     return {
       categories: ["Magic & Mysticism", "Supernatural Phenomena"],
@@ -421,12 +411,7 @@ The formation process remains largely mysterious, though most agree it occurs on
   } else {
     const contentModel = openai('gpt-4o');
 
-    const result = await Sentry.startSpan(
-      {
-        op: "ai.generate",
-        name: "Generate Wiki Content",
-      },
-      async () => streamText({
+    const result = await streamText({
       model: contentModel,
       system: WORLDBUILDING_SYSTEM,
       prompt: `Generate a wiki article about "${title}" in a possible universe. Do not imply that the universe is fictional.
@@ -438,7 +423,7 @@ Naturally incorporate:
 - Facts: ${metadata.basicFacts.slice(0, 3).map(f => `${f.name}:${f.value}`).join(', ')}
 
 Write a detailed and engaging encyclopedic article, with 3-4 paragraphs. Be authoritative and matter-of-fact, no matter how fantastical the subject. Ensure consistency with the existing worldbuilding context provided. Output only article content, no formatting.`
-    }));
+    });
 
 
     for await (const textDelta of result.textStream) {
@@ -566,12 +551,7 @@ export async function handleGenerateSection(
   const model = openai('gpt-4o');
 
 
-  const result = await Sentry.startSpan(
-    {
-      op: "ai.generate",
-      name: "Generate Wiki Section",
-    },
-    async () => streamText({
+  const result = await streamText({
     model: model,
     system: 'Generate concise wiki section content.',
     prompt: `Page: "${pageTitle}"
@@ -579,7 +559,7 @@ Context: ${pageContent.substring(0, 500)}...
 Section: "${capitalizedSectionTitle}"${worldbuildingHistory ? `\nWorld: ${getWorldbuildingContext(worldbuildingHistory)}` : ''}
 
 Write 2-3 encyclopedic sentences for this section. Match the page tone. Output only content.`
-  }));
+  });
 
   let accumulatedText = '';
 
@@ -714,12 +694,7 @@ export async function handleImageGeneration(
       }) + '\n\n');
     }
 
-    const result = await Sentry.startSpan(
-      {
-        op: "ai.generate",
-        name: "Generate Image with DALL-E",
-      },
-      async () => generateImage({
+    const result = await generateImage({
       model: openai.image('dall-e-3'),
       prompt: imagePrompt,
       n: 1,
@@ -730,7 +705,7 @@ export async function handleImageGeneration(
           style: 'natural'
         }
       }
-    }));
+    });
 
     if (writeData) {
       writeData('data: ' + JSON.stringify({
@@ -788,10 +763,6 @@ export async function handleImageGeneration(
             }
           } catch (uploadError) {
             console.error('Failed to upload to blob storage, falling back to data URL:', uploadError);
-            Sentry.captureException(uploadError, {
-              tags: { operation: 'blob_storage_upload' },
-              extra: { imagePrompt, pageId }
-            });
             // Fallback to data URL if upload fails
             const mediaType = generatedImage?.mediaType || 'image/png';
             imageUrl = base64Data
@@ -827,10 +798,6 @@ export async function handleImageGeneration(
     return finalData;
   } catch (error) {
     console.error('Image generation error:', error);
-    Sentry.captureException(error, {
-      tags: { operation: 'image_generation' },
-      extra: { pageTitle, pageContent, pageId }
-    });
     throw {
       status: 500,
       error: 'Image generation failed',
