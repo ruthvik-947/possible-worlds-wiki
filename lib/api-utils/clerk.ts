@@ -35,6 +35,14 @@ export async function getUserIdFromHeaders(headers: IncomingHttpHeaders): Promis
 
 // New function using Clerk SDK - more robust for production
 export async function getUserIdFromHeadersSDK(headers: IncomingHttpHeaders): Promise<string> {
+  console.log('Clerk authentication attempt:', {
+    hasSecretKey: !!secretKey,
+    hasPublishableKey: !!process.env.CLERK_PUBLISHABLE_KEY,
+    hasAuthHeader: !!headers.authorization,
+    authHeaderType: typeof headers.authorization,
+    authHeaderLength: headers.authorization?.length
+  });
+
   const clerkClient = createClerkClient({
     secretKey: secretKey!,
     publishableKey: process.env.CLERK_PUBLISHABLE_KEY
@@ -48,12 +56,14 @@ export async function getUserIdFromHeadersSDK(headers: IncomingHttpHeaders): Pro
 
   try {
     const { isAuthenticated, toAuth } = await clerkClient.authenticateRequest(mockRequest);
+    console.log('Clerk authenticateRequest result:', { isAuthenticated });
 
     if (!isAuthenticated) {
       throw new Error('Request is not authenticated');
     }
 
     const { userId } = toAuth();
+    console.log('Clerk toAuth result:', { hasUserId: !!userId, userId: userId?.substring(0, 8) + '...' });
 
     if (!userId) {
       throw new Error('No user ID found in authenticated request');
@@ -61,6 +71,11 @@ export async function getUserIdFromHeadersSDK(headers: IncomingHttpHeaders): Pro
 
     return userId;
   } catch (error: any) {
+    console.error('Clerk authentication failed:', {
+      errorMessage: error.message,
+      errorType: error.constructor.name,
+      hasAuthHeader: !!headers.authorization
+    });
     throw new Error(`Authentication failed: ${error.message}`);
   }
 }
