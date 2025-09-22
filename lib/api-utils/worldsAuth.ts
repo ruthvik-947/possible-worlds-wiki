@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { IncomingHttpHeaders } from 'http';
+import * as Sentry from '@sentry/node';
 import dotenv from 'dotenv';
 
 // Load environment variables
@@ -9,10 +10,15 @@ const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 if (!supabaseUrl || !supabaseServiceKey) {
-  console.error('Missing Supabase environment variables:');
-  console.error('SUPABASE_URL:', supabaseUrl);
-  console.error('SUPABASE_SERVICE_ROLE_KEY:', supabaseServiceKey ? '[REDACTED]' : 'undefined');
-  throw new Error('SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are required');
+  const error = new Error('SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are required');
+  Sentry.captureException(error, {
+    tags: { operation: 'supabase_config' },
+    extra: {
+      hasUrl: !!supabaseUrl,
+      hasServiceKey: !!supabaseServiceKey
+    }
+  });
+  throw error;
 }
 
 // Service role client for admin operations
@@ -195,6 +201,7 @@ export async function getWorldAuth(headers: IncomingHttpHeaders, worldId: string
     payload = JSON.parse(data.payload);
   } catch (parseError) {
     console.error('Failed to parse world payload:', parseError);
+    Sentry.captureException(parseError, { tags: { operation: 'parse_world_payload' } });
   }
 
   return {

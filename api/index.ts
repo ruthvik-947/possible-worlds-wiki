@@ -14,6 +14,10 @@ dotenv.config({ path: '.env.local' });
 if (process.env.NODE_ENV === 'production' && process.env.SENTRY_DSN) {
   Sentry.init({
     dsn: process.env.SENTRY_DSN,
+    integrations: [
+      // send console.log, console.warn, and console.error calls as logs to Sentry
+      Sentry.consoleLoggingIntegration({ levels: ["log", "warn", "error"] }),
+    ],
     environment: process.env.NODE_ENV || 'production',
     tracesSampleRate: 0.1, // 10% of transactions for performance monitoring
     enableLogs: true, // Capture console errors automatically
@@ -424,6 +428,7 @@ app.get('/api/test-rls', requireAuth(), async (req: any, res: any) => {
 // Global error handler
 app.use((err: any, _req: any, res: any, _next: any) => {
   console.error('Unhandled error:', err);
+  Sentry.captureException(err, { tags: { operation: 'unhandled_error' } });
 
   // Don't expose stack traces in production
   const isDev = process.env.NODE_ENV !== 'production';
@@ -438,4 +443,5 @@ app.use((err: any, _req: any, res: any, _next: any) => {
 
 app.listen(port, () => {
   console.log(`Server is running on http://localhost:${port}`);
+  Sentry.addBreadcrumb({ message: `Express server started on port ${port}`, level: 'info' });
 });
