@@ -1,5 +1,6 @@
 import { SignedIn, SignedOut, SignIn, UserButton } from '@clerk/clerk-react';
 import { WikiInterface } from './components/WikiInterface';
+import { Analytics } from "@vercel/analytics/react"
 
 export default function App() {
   return (
@@ -60,6 +61,8 @@ export default function App() {
         <SignedIn>
           <WikiInterface />
         </SignedIn>
+
+        <Analytics />
       </main>
     </div>
   );

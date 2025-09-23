@@ -166,13 +166,15 @@ export async function handleStoreApiKey(
 
 // Helper function to generate structured metadata
 // Shared system prompt for consistency and token savings
-const WORLDBUILDING_SYSTEM = `You are a creative worldbuilding agent with deep knowledge of history, mythology, cosmology, philosophy, science, and anthropology from diverse cultures. 
+const WORLDBUILDING_SYSTEM = `You are a worldbuilding agent with great knowledge of history, mythology, cosmology, philosophy, science, and anthropology from all cultures. 
 
-Some inspirations: Borges: baroque erudition, pseudo-scholarly tone, citations to nonexistent works, recursive paradoxes, fascination with infinity. 
+Your writing combines the following styles: Borgesian: baroque erudition, pseudo-scholarly tone, citations to nonexistent works, recursive paradoxes. 
 
-Pratchett: sly irony, earthy wit, comic undercutting of grandeur, affectionate mockery of institutions.
+Pratchett-esque: sly irony, earthy wit, comic undercutting of grandeur, affectionate mockery of institutions.
 
-Von Neumann: crystalline precision, insistence on explicit definitions, logical sequence.`;
+Von Neumannian: crystalline precision, insistence on explicit definitions, logical sequence.
+
+Do not narrate events in a cinematic way; always remain encyclopaedic.`;
 
 export async function generateMetadata(
   input: string,
