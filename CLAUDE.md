@@ -11,11 +11,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `npm run lint` - Run ESLint
 - `npm run typecheck` - Run TypeScript type checking
 
-**Backend Development (Dual Server Architecture):**
+**Backend Development:**
 
-This project maintains both Express and Vercel servers for flexibility:
-- **Express**: Faster startup, easier debugging, works offline
-- **Vercel Functions**: Production-like environment, tests edge cases
+The backend now runs through a single Express application that serves both
+local development and the Vercel deployment. Locally the server listens on
+`localhost:3001`, while production requests are forwarded to the same handler
+via the `/api/*` rewrite defined in `vercel.json`.
 
 **Option 1: Express Development Server (Recommended for Development)**
 ```bash
@@ -61,16 +62,16 @@ This is a **PossibleWorldWikis** application - an AI-powered interactive worldbu
 - **API Configuration**: `lib/config.ts` - Environment-aware API endpoint configuration
 
 ### Backend (Unified Architecture)
-- **API Routes** in `/api`:
-  - `config.ts` - Returns server configuration (API key mode)
-  - `generate.ts` - Main wiki page generation using OpenAI GPT-4o (Vercel function)
-  - `generate-section.ts` - Generates additional content sections (Vercel function)
-  - `store-key.ts` - Handles temporary user API key storage
-  - `index.ts` - Express server for development (mirrors Vercel functions)
+- **API Routes** served from `api/index.ts`:
+  - Handles all `/api/*` endpoints (config, usage, key storage, world routes,
+    wiki generation, and image creation) through a single Express app
+- **Deployment**: `vercel.json` rewrites `/api/(.*)` to the Express handler so
+  only one Serverless Function is deployed (avoiding the 12-function Hobby
+  limit)
 - **Shared Logic**:
   - `lib/api-utils/shared-handlers.ts` - Common streaming logic used by both Express and Vercel
   - `lib/api-utils/shared.ts` - Common functions and worldbuilding categories
-  - `lib/api-utils/sentry.ts` - Centralized Sentry error tracking for Vercel functions
+  - `lib/api-utils/sentry.ts` - Centralized Sentry error tracking for backend operations
 
 **🎯 Architecture Principle: Single Source of Truth**
 All API endpoints use shared handlers from `lib/api-utils/shared-handlers.ts` to ensure identical behavior between development (Express) and production (Vercel) environments.
@@ -94,7 +95,8 @@ All API endpoints use shared handlers from `lib/api-utils/shared-handlers.ts` to
 ### Error Monitoring (Sentry)
 - **Frontend**: Errors captured automatically in `main.tsx`
 - **Express Backend**: Errors captured in `api/index.ts` with operation tags
-- **Vercel Functions**: Errors captured in each function via `lib/api-utils/sentry.ts`
+- **Shared Utilities**: `lib/api-utils/sentry.ts` centralizes configuration for
+  any helper modules that need server-side logging
 - **Configuration**: Uses `sendDefaultPii: false` to not collect IP addresses and user context
 - All errors tagged with operation context for better debugging
 
@@ -157,27 +159,8 @@ When adding a new API endpoint:
    });
    ```
 
-3. **Create Vercel function** in `api/new-feature.ts`:
-   ```typescript
-   import { initSentry, Sentry } from '../lib/api-utils/sentry.js';
-
-   initSentry();
-
-   export default async function handler(req: VercelRequest, res: VercelResponse) {
-     // Get client IP, set headers
-     try {
-       await handleNewFeature(
-         req.body.param1,
-         ip,
-         (data) => res.write(data),
-         () => res.end()
-       );
-     } catch (error) {
-       console.error('New feature error:', error);
-       Sentry.captureException(error, { tags: { operation: 'new_feature' } });
-       // Error handling
-     }
-   }
-   ```
+3. **Verify deployment**: Ensure the route is handled inside `api/index.ts`. No
+   additional files are needed because Vercel rewrites all `/api/*` requests to
+   this Express app.
 
 4. **Test parity**: Run `npm run test:api-parity` to ensure consistency
