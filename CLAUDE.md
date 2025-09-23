@@ -95,7 +95,7 @@ All API endpoints use shared handlers from `lib/api-utils/shared-handlers.ts` to
 - **Frontend**: Errors captured automatically in `main.tsx`
 - **Express Backend**: Errors captured in `api/index.ts` with operation tags
 - **Vercel Functions**: Errors captured in each function via `lib/api-utils/sentry.ts`
-- **Configuration**: Uses `sendDefaultPii: true` to collect IP addresses and user context
+- **Configuration**: Uses `sendDefaultPii: false` to not collect IP addresses and user context
 - All errors tagged with operation context for better debugging
 
 ### UI System

@@ -62,7 +62,6 @@ async function handleImageRequest(req: VercelRequest, res: VercelResponse) {
       pageId
     );
   } catch (error: any) {
-    console.error('Vercel image generation error:', error);
     Sentry.captureException(error, { tags: { operation: 'generate_image' } });
     if (error.status) {
       res.status(error.status).json({

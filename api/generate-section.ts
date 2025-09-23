@@ -61,7 +61,6 @@ async function handleSectionRequest(req: VercelRequest, res: VercelResponse) {
       () => res.end()
     );
   } catch (error: any) {
-    console.error('Vercel generate-section error:', error);
     Sentry.captureException(error, { tags: { operation: 'generate_section' } });
     if (error.status) {
       res.status(error.status).json({

@@ -50,14 +50,12 @@ export async function storeApiKey(userId: string, apiKey: string): Promise<void>
     });
 
     if (error) {
-      console.error('Failed to store API key in Vault:', error);
       Sentry.captureException(error, { tags: { operation: 'store_api_key_vault' } });
       // Fall back to in-memory storage
       inMemoryKeys.set(userId, { apiKey, timestamp: Date.now() });
     }
   } catch (error) {
-    console.error('Failed to store API key in Vault:', error);
-      Sentry.captureException(error, { tags: { operation: 'store_api_key_vault' } });
+    Sentry.captureException(error, { tags: { operation: 'store_api_key_vault' } });
     // Fall back to in-memory storage
     inMemoryKeys.set(userId, { apiKey, timestamp: Date.now() });
   }
@@ -92,7 +90,6 @@ export async function getApiKey(userId: string): Promise<string | null> {
     });
 
     if (error) {
-      console.error('Failed to retrieve API key from Vault:', error);
       Sentry.captureException(error, { tags: { operation: 'get_api_key_vault' } });
       // Fall back to in-memory storage
       const stored = inMemoryKeys.get(userId);
@@ -109,8 +106,7 @@ export async function getApiKey(userId: string): Promise<string | null> {
 
     return data;
   } catch (error) {
-    console.error('Failed to retrieve API key from Vault:', error);
-      Sentry.captureException(error, { tags: { operation: 'get_api_key_vault' } });
+    Sentry.captureException(error, { tags: { operation: 'get_api_key_vault' } });
     // Fall back to in-memory storage
     const stored = inMemoryKeys.get(userId);
     if (stored) {
@@ -146,12 +142,10 @@ export async function removeApiKey(userId: string): Promise<void> {
     });
 
     if (error) {
-      console.error('Failed to remove API key from Vault:', error);
       Sentry.captureException(error, { tags: { operation: 'remove_api_key_vault' } });
     }
   } catch (error) {
-    console.error('Failed to remove API key from Vault:', error);
-      Sentry.captureException(error, { tags: { operation: 'remove_api_key_vault' } });
+    Sentry.captureException(error, { tags: { operation: 'remove_api_key_vault' } });
   }
 }
 

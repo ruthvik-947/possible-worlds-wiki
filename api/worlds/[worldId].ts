@@ -46,7 +46,6 @@ async function handleWorldRequest(req: VercelRequest, res: VercelResponse) {
 
       res.json(record);
     } catch (error) {
-      console.error('Failed to get world:', error);
       Sentry.captureException(error, { tags: { operation: 'get_world' } });
       res.status(500).json({ error: 'Failed to load world' });
     }
@@ -60,7 +59,6 @@ async function handleWorldRequest(req: VercelRequest, res: VercelResponse) {
 
       res.json({ success: true });
     } catch (error) {
-      console.error('Failed to delete world:', error);
       Sentry.captureException(error, { tags: { operation: 'delete_world' } });
       res.status(500).json({ error: 'Failed to delete world' });
     }

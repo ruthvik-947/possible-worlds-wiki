@@ -36,7 +36,6 @@ async function handleWorldsRequest(req: VercelRequest, res: VercelResponse) {
       const worlds = await listWorldsAuth(req.headers);
       res.json(worlds);
     } catch (error) {
-      console.error('Failed to list worlds:', error);
       Sentry.captureException(error, { tags: { operation: 'list_worlds' } });
       res.status(500).json({ error: 'Failed to load worlds' });
     }
@@ -52,7 +51,6 @@ async function handleWorldsRequest(req: VercelRequest, res: VercelResponse) {
       const summary = await saveWorldAuth(req.headers, userId, world);
       res.json(summary);
     } catch (error: any) {
-      console.error('Failed to save world:', error);
       Sentry.captureException(error, { tags: { operation: 'save_world' } });
       res.status(500).json({ error: error?.message || 'Failed to save world' });
     }

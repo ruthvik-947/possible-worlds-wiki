@@ -61,7 +61,6 @@ async function handleGenerateRequest(req: VercelRequest, res: VercelResponse) {
       () => res.end()
     );
   } catch (error: any) {
-    console.error('Vercel generate error:', error);
     Sentry.captureException(error, { tags: { operation: 'generate_wiki' } });
     if (error.status) {
       res.status(error.status).json({

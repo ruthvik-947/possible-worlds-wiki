@@ -14,10 +14,7 @@ dotenv.config({ path: '.env.local' });
 if (process.env.NODE_ENV === 'production' && process.env.SENTRY_DSN) {
   Sentry.init({
     dsn: process.env.SENTRY_DSN,
-    integrations: [
-      // send console.log, console.warn, and console.error calls as logs to Sentry
-      Sentry.consoleLoggingIntegration({ levels: ["log", "warn", "error"] }),
-    ],
+    integrations: [],
     environment: process.env.NODE_ENV || 'production',
     tracesSampleRate: 0.1, // 10% of transactions for performance monitoring
     enableLogs: true, // Capture console errors automatically
@@ -142,7 +139,6 @@ app.get('/api/usage', globalRateLimit, requireAuth(), async (req: any, res: any)
       });
     }
   } catch (error) {
-    console.error('Failed to get usage:', error);
     Sentry.captureException(error, { tags: { operation: 'get_usage' } });
     res.status(500).json({ error: 'Failed to get usage information' });
   }
@@ -154,7 +150,6 @@ app.get('/api/store-key', apiKeyRateLimit, requireAuth(), async (req: any, res: 
     const result = await handleStoreApiKey('GET', undefined, req.auth()?.userId);
     res.json(result);
   } catch (error: any) {
-    console.error('Store key GET error:', error);
     Sentry.captureException(error, { tags: { operation: 'store_key_get' } });
     res.status(error.status || 500).json({
       error: error.error || 'Internal Server Error',
@@ -169,7 +164,6 @@ app.post('/api/store-key', apiKeyRateLimit, requireAuth(), async (req: any, res:
     const result = await handleStoreApiKey('POST', apiKey, req.auth()?.userId);
     res.json(result);
   } catch (error: any) {
-    console.error('Store key POST error:', error);
     Sentry.captureException(error, { tags: { operation: 'store_key_post' } });
     res.status(error.status || 500).json({
       error: error.error || 'Internal Server Error',
@@ -183,7 +177,6 @@ app.delete('/api/store-key', apiKeyRateLimit, requireAuth(), async (req: any, re
     const result = await handleStoreApiKey('DELETE', undefined, req.auth()?.userId);
     res.json(result);
   } catch (error: any) {
-    console.error('Store key DELETE error:', error);
     Sentry.captureException(error, { tags: { operation: 'store_key_delete' } });
     res.status(error.status || 500).json({
       error: error.error || 'Internal Server Error',
@@ -203,7 +196,6 @@ app.get('/api/worlds', worldRateLimit, requireAuth(), async (req: any, res: any)
     const worlds = await listWorldsAuth(req.headers);
     res.json(worlds);
   } catch (error) {
-    console.error('Failed to list worlds:', error);
     Sentry.captureException(error, { tags: { operation: 'list_worlds' } });
     res.status(500).json({ error: 'Failed to load worlds' });
   }
@@ -226,7 +218,6 @@ app.get('/api/worlds/:worldId', worldRateLimit, requireAuth(), async (req: any, 
 
     res.json(record);
   } catch (error) {
-    console.error('Failed to get world:', error);
     Sentry.captureException(error, { tags: { operation: 'get_world' } });
     res.status(500).json({ error: 'Failed to load world' });
   }
@@ -249,7 +240,6 @@ app.post('/api/worlds', worldRateLimit, requireAuth(), async (req: any, res: any
     const summary = await saveWorldAuth(req.headers, userId, world);
     res.json(summary);
   } catch (error: any) {
-    console.error('Failed to save world:', error);
     Sentry.captureException(error, { tags: { operation: 'save_world' } });
     res.status(500).json({ error: error?.message || 'Failed to save world' });
   }
@@ -272,7 +262,6 @@ app.delete('/api/worlds/:worldId', worldRateLimit, requireAuth(), async (req: an
 
     res.json({ success: true });
   } catch (error) {
-    console.error('Failed to delete world:', error);
     Sentry.captureException(error, { tags: { operation: 'delete_world' } });
     res.status(500).json({ error: 'Failed to delete world' });
   }
@@ -301,7 +290,6 @@ app.post('/api/generate', wikiRateLimit, requireAuth(), async (req: any, res: an
       () => res.end()
     );
   } catch (error: any) {
-    console.error('Express: Error:', error);
     Sentry.captureException(error, { tags: { operation: 'generate_wiki' } });
     // Don't send JSON if we've already started streaming
     if (!res.headersSent) {
@@ -343,7 +331,6 @@ app.post('/api/generate-section', wikiRateLimit, requireAuth(), async (req: any,
       () => res.end() // endResponse callback
     );
   } catch (error: any) {
-    console.error('Express: Section error:', error);
     Sentry.captureException(error, { tags: { operation: 'generate_section' } });
     if (error.status) {
       res.status(error.status).json({
@@ -383,7 +370,6 @@ app.post('/api/generate-image', imageRateLimit, requireAuth(), async (req: any, 
       pageId
     );
   } catch (error: any) {
-    console.error('Express: Image generation error:', error);
     Sentry.captureException(error, { tags: { operation: 'generate_image_express' } });
     if (error.status) {
       res.status(error.status).json({
@@ -414,7 +400,6 @@ app.get('/api/test-rls', requireAuth(), async (req: any, res: any) => {
       message: 'RLS integration test completed'
     });
   } catch (error) {
-    console.error('RLS test failed:', error);
     res.status(500).json({
       error: 'RLS test failed',
       details: error instanceof Error ? error.message : 'Unknown error'
@@ -427,7 +412,6 @@ app.get('/api/test-rls', requireAuth(), async (req: any, res: any) => {
 
 // Global error handler
 app.use((err: any, _req: any, res: any, _next: any) => {
-  console.error('Unhandled error:', err);
   Sentry.captureException(err, { tags: { operation: 'unhandled_error' } });
 
   // Don't expose stack traces in production

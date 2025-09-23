@@ -6,13 +6,10 @@ export function initSentry() {
   if (!sentryInitialized && process.env.SENTRY_DSN) {
     Sentry.init({
       dsn: process.env.SENTRY_DSN,
-      integrations: [
-        // send console.log, console.warn, and console.error calls as logs to Sentry
-        Sentry.consoleLoggingIntegration({ levels: ["log", "warn", "error"] }),
-      ],
+      integrations: [],
       environment: process.env.NODE_ENV || 'production',
       tracesSampleRate: 1.0,
-      sendDefaultPii: true
+      sendDefaultPii: false
     });
     sentryInitialized = true;
   }

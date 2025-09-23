@@ -9,6 +9,8 @@ import { Button } from './ui/button';
 import { toast } from 'sonner';
 import { useAuth } from '@clerk/clerk-react';
 
+const SPECIAL_REGEX_CHARS = /[\\^$.*+?()[\]{}|]/g;
+
 interface WikiPageProps {
   page: WikiPageData;
   onTermClick: (term: string, context: string) => void;
@@ -165,12 +167,22 @@ export function WikiPage({ page, onTermClick, worldbuildingHistory, enableUserAp
     setImageProgress(undefined);
   }, [page.id]);
 
+  const escapeRegExp = (value: string) => value.replace(SPECIAL_REGEX_CHARS, '\\$&');
+
   const renderContentWithLinks = (content: string) => {
     if (page.clickableTerms.length === 0) {
       return <span>{content}</span>;
     }
 
-    const regex = new RegExp(`(${page.clickableTerms.join('|')})`, 'g');
+    const escapedTerms = page.clickableTerms
+      .map(term => escapeRegExp(term))
+      .filter(term => term.length > 0);
+
+    if (escapedTerms.length === 0) {
+      return <span>{content}</span>;
+    }
+
+    const regex = new RegExp(`(${escapedTerms.join('|')})`, 'g');
     const parts = content.split(regex);
 
     return parts.map((part, index) => {
