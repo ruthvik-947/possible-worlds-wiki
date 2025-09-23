@@ -425,7 +425,11 @@ app.use((err: any, _req: any, res: any, _next: any) => {
   });
 });
 
-app.listen(port, () => {
-  console.log(`Server is running on http://localhost:${port}`);
-  Sentry.addBreadcrumb({ message: `Express server started on port ${port}`, level: 'info' });
-});
+if (!process.env.VERCEL) {
+  app.listen(port, () => {
+    console.log(`Server is running on http://localhost:${port}`);
+    Sentry.addBreadcrumb({ message: `Express server started on port ${port}`, level: 'info' });
+  });
+}
+
+export default app;
