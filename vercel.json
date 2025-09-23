@@ -2,10 +2,15 @@
   "buildCommand": "npm run build",
   "devCommand": "npm run dev",
   "installCommand": "npm install",
-  "routes": [
+  "rewrites": [
     {
-      "src": "/api/(.*)",
-      "dest": "/api/index.ts"
+      "source": "/api/(.*)",
+      "destination": "/api"
     }
-  ]
+  ],
+  "functions": {
+    "api/index.ts": {
+      "maxDuration": 10
+    }
+  }
 }

@@ -425,6 +425,7 @@ app.use((err: any, _req: any, res: any, _next: any) => {
   });
 });
 
+// For local development, start the server
 if (!process.env.VERCEL) {
   app.listen(port, () => {
     console.log(`Server is running on http://localhost:${port}`);
@@ -432,4 +433,6 @@ if (!process.env.VERCEL) {
   });
 }
 
+// For Vercel, export the Express app as a serverless function handler
+// Vercel will call this with (req, res) for each request
 export default app;
