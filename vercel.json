@@ -4,7 +4,7 @@
   "installCommand": "npm install",
   "functions": {
     "api/index.ts": {
-      "runtime": "nodejs20.x"
+      "runtime": "@vercel/node"
     }
   },
   "routes": [
