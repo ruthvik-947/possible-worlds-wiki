@@ -28,12 +28,58 @@ export function ShareWorldDialog({ world, isOpen, onOpenChange }: ShareWorldDial
 
   // Reset state when dialog opens
   useEffect(() => {
-    if (isOpen) {
-      setSharedWorld(null);
-      setCopied(false);
-      // TODO: Check if this world is already shared and load existing share info
+    if (!isOpen) {
+      return;
     }
-  }, [isOpen]);
+
+    let isCancelled = false;
+
+    setSharedWorld(null);
+    setCopied(false);
+
+    const fetchExistingShare = async () => {
+      try {
+        const token = await getToken({ skipCache: true });
+        if (!token) {
+          return;
+        }
+
+        const response = await fetch(`${config.endpoints.worlds}/shared`, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to fetch shared worlds');
+        }
+
+        const data = await response.json();
+        if (isCancelled || !Array.isArray(data?.shares)) {
+          return;
+        }
+
+        const existingShare = data.shares.find((share: any) => share.world_id === world.id && share.is_active !== false);
+
+        if (existingShare && !isCancelled) {
+          setSharedWorld({
+            shareId: existingShare.share_id,
+            shareSlug: existingShare.share_url_slug,
+            shareUrl: existingShare.shareUrl || `${window.location.origin}/world/${existingShare.share_url_slug}`
+          });
+        }
+      } catch (error) {
+        console.error('Failed to load existing share info:', error);
+      }
+    };
+
+    fetchExistingShare();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [isOpen, getToken, world.id]);
 
   const generateShareUrl = async () => {
     if (!world || isGenerating) return;
