@@ -1,4 +1,5 @@
 import React, { useState, useCallback } from 'react';
+import { toast } from 'sonner';
 import { WikiPageData, generateWikiPage } from '../components/WikiGenerator';
 import { World, updateWorldMetadata } from '../components/WorldModel';
 import { updateWorldbuildingHistory } from '../components/WorldbuildingHistory';
@@ -42,7 +43,6 @@ export function usePageGeneration(
   }, [currentPageId, setPageHistory, setCurrentPageId]);
 
   const handleTermClick = useCallback(async (term: string, context: string) => {
-    const { toast } = require('sonner');
 
     // Check if page already exists
     const existingPageId = Array.from(pages.keys()).find(id =>

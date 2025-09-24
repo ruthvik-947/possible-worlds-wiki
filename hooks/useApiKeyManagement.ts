@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@clerk/clerk-react';
+import { toast } from 'sonner';
 import { config } from '../lib/config';
 
 export interface UseApiKeyManagementReturn {
@@ -28,7 +29,6 @@ export function useApiKeyManagement(): UseApiKeyManagementReturn {
   }, [getToken]);
 
   const showApiKeyRequiredToast = useCallback(() => {
-    const { toast } = require('sonner');
     toast.error(
       'Please set your API key first',
       {
@@ -43,13 +43,11 @@ export function useApiKeyManagement(): UseApiKeyManagementReturn {
   }, []);
 
   const handleApiKeyStored = useCallback(() => {
-    const { toast } = require('sonner');
     setHasUserApiKey(true);
     toast.success('API key set');
   }, []);
 
   const handleApiKeyRemoved = useCallback(() => {
-    const { toast } = require('sonner');
     setHasUserApiKey(false);
     toast.success('API key removed');
   }, []);

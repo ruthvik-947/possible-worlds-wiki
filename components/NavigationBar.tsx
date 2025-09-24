@@ -1,6 +1,6 @@
 import { Button } from './ui/button';
 import { Input } from './ui/input';
-import { Menu, Search, Settings, Key, Info, LogOut } from 'lucide-react';
+import { Menu, Search, Settings, Key, Info } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -8,7 +8,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from './ui/dropdown-menu';
-import { SignOutButton } from '@clerk/clerk-react';
+import { UserButton } from '@clerk/clerk-react';
 import { WikiPageData } from './WikiGenerator';
 
 interface NavigationBarProps {
@@ -87,6 +87,19 @@ export function NavigationBar({
 
         {/* Right Menu */}
         <div className="flex items-center space-x-2">
+          {/* User Profile Button */}
+          <UserButton
+            afterSignOutUrl="/"
+            appearance={{
+              elements: {
+                avatarBox: "h-8 w-8",
+                userButtonPopoverCard: "bg-white border border-gray-200 shadow-lg",
+                userButtonPopoverActionButton: "hover:bg-gray-50",
+                userButtonPopoverActionButtonText: "text-gray-700",
+                userButtonPopoverActionButtonIcon: "text-gray-500"
+              }
+            }}
+          />
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button
@@ -118,13 +131,6 @@ export function NavigationBar({
                 <Info className="mr-2 h-4 w-4" />
                 About
               </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <SignOutButton signOutOptions={{ redirectUrl: '/' }}>
-                <DropdownMenuItem className="cursor-pointer">
-                  <LogOut className="mr-2 h-4 w-4" />
-                  Sign out
-                </DropdownMenuItem>
-              </SignOutButton>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>

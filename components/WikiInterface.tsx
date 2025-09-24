@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Loader } from 'lucide-react';
+import { toast } from 'sonner';
 import { WikiPage } from './WikiPage';
 import { WikiPageData } from './WikiGenerator';
 import { About } from './About';
@@ -64,7 +65,6 @@ export function WikiInterface() {
   }, []);
 
   const handleUpgradeRequested = () => {
-    const { toast } = require('sonner');
     if (apiKeyManagement.enableUserApiKeys) {
       apiKeyManagement.setIsApiDialogOpen(true);
     } else {

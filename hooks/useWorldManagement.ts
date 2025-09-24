@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '@clerk/clerk-react';
+import { toast } from 'sonner';
 import { World, createNewWorld, updateWorldMetadata, importWorld } from '../components/WorldModel';
 import { WikiPageData } from '../components/WikiGenerator';
 import { saveWorldToServer } from '../lib/worldService';
@@ -194,7 +195,6 @@ export function useWorldManagement(
   }, [setPages, setCurrentPageId, setPageHistory]);
 
   const handleImportWorld = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
-    const { toast } = require('sonner');
     const file = event.target.files?.[0];
     if (!file) return;
 
