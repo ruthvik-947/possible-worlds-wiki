@@ -1086,6 +1086,17 @@ export function WikiInterface() {
 
       <Toaster position="bottom-right" theme={isDarkMode ? 'dark' : 'light'} />
 
+      {/* API Key Dialog - Available globally when user API keys are enabled */}
+      {enableUserApiKeys && (
+        <ApiKeyDialog
+          hasApiKey={hasUserApiKey}
+          onStored={handleApiKeyStored}
+          onRemoved={handleApiKeyRemoved}
+          isLoading={isLoading}
+          open={isApiDialogOpen}
+          onOpenChange={setIsApiDialogOpen}
+        />
+      )}
     </div>
   );
 }

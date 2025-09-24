@@ -1,9 +1,7 @@
 import {
   SignedIn,
   SignedOut,
-  SignIn,
   SignInButton,
-  SignUp,
   SignUpButton,
   UserButton
 } from '@clerk/clerk-react';
