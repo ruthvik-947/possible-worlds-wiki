@@ -813,3 +813,487 @@ export async function handleImageGeneration(
     };
   }
 }
+
+// ==================== WORLD SHARING HANDLERS ====================
+
+import { createClient } from '@supabase/supabase-js';
+import { createHash } from 'crypto';
+import dotenv from 'dotenv';
+
+dotenv.config({ path: '.env.local' });
+
+const supabaseUrl = process.env.SUPABASE_URL;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+if (!supabaseUrl || !supabaseServiceKey) {
+  console.warn('Supabase environment variables not configured. Sharing features will not work.');
+}
+
+const supabaseAdmin = supabaseUrl && supabaseServiceKey ?
+  createClient(supabaseUrl, supabaseServiceKey) : null;
+
+// Input validation schemas for sharing
+const shareWorldSchema = z.object({
+  worldId: z.string().min(1, 'World ID is required'),
+  worldSnapshot: z.record(z.any()).refine((data) => {
+    return data && typeof data.id === 'string' && typeof data.name === 'string';
+  }, 'Invalid world snapshot format'),
+  expiresAt: z.string().optional() // ISO date string
+});
+
+const copySharedWorldSchema = z.object({
+  shareSlug: z.string().min(1, 'Share slug is required'),
+  newWorldId: z.string().min(1, 'New world ID is required')
+});
+
+/**
+ * Generate a share URL for a world
+ */
+export async function handleShareWorld(
+  worldId: string,
+  worldSnapshot: any,
+  userId: string,
+  expiresAt?: string,
+  clientIP?: string,
+  writeData?: (data: string) => void,
+  endResponse?: () => void
+) {
+  if (!supabaseAdmin) {
+    throw {
+      status: 500,
+      error: 'Service unavailable',
+      message: 'Sharing functionality is not configured'
+    };
+  }
+
+  try {
+    // Validate input
+    const validatedInput = shareWorldSchema.parse({
+      worldId,
+      worldSnapshot,
+      expiresAt
+    });
+
+    if (writeData) {
+      writeData('data: ' + JSON.stringify({
+        status: 'generating_url',
+        message: 'Creating share URL...'
+      }) + '\n\n');
+    }
+
+    // Generate a unique share slug
+    const { data: slugData, error: slugError } = await supabaseAdmin
+      .rpc('generate_share_slug');
+
+    if (slugError || !slugData) {
+      console.error('Error generating share slug:', slugError);
+      throw new Error('Failed to generate share URL');
+    }
+
+    const shareSlug = slugData;
+
+    // Calculate world metadata
+    const pageCount = Object.keys(worldSnapshot.pages || {}).length;
+    const worldName = worldSnapshot.name || 'Untitled World';
+    const worldDescription = worldSnapshot.description || '';
+
+    // Insert the shared world record
+    const { data: sharedWorld, error: insertError } = await supabaseAdmin
+      .from('shared_worlds')
+      .insert({
+        world_id: worldId,
+        user_id: userId,
+        share_url_slug: shareSlug,
+        world_snapshot: worldSnapshot,
+        world_name: worldName,
+        world_description: worldDescription,
+        page_count: pageCount,
+        expires_at: expiresAt ? new Date(expiresAt).toISOString() : null
+      })
+      .select('share_id, share_url_slug, created_at')
+      .single();
+
+    if (insertError) {
+      console.error('Error inserting shared world:', insertError);
+      throw new Error('Failed to create shared world');
+    }
+
+    const shareUrl = `${process.env.VITE_APP_URL || 'http://localhost:5173'}/world/${shareSlug}`;
+
+    const responseData = {
+      status: 'success',
+      shareId: sharedWorld.share_id,
+      shareSlug: sharedWorld.share_url_slug,
+      shareUrl: shareUrl,
+      createdAt: sharedWorld.created_at,
+      expiresAt: expiresAt || null
+    };
+
+    if (writeData) {
+      writeData('data: ' + JSON.stringify(responseData) + '\n\n');
+    }
+
+    if (endResponse) {
+      endResponse();
+    }
+
+    return responseData;
+
+  } catch (error) {
+    console.error('Share world error:', error);
+    if (error instanceof z.ZodError) {
+      throw {
+        status: 400,
+        error: 'Invalid input',
+        message: error.errors[0]?.message || 'Invalid input data'
+      };
+    }
+    throw {
+      status: 500,
+      error: 'Failed to share world',
+      message: 'An error occurred while creating the share URL'
+    };
+  }
+}
+
+/**
+ * Get a shared world by its slug
+ */
+export async function handleGetSharedWorld(
+  shareSlug: string,
+  clientIP?: string,
+  userId?: string
+) {
+  if (!supabaseAdmin) {
+    throw {
+      status: 500,
+      error: 'Service unavailable',
+      message: 'Sharing functionality is not configured'
+    };
+  }
+
+  try {
+    // Fetch the shared world
+    const { data: sharedWorld, error: fetchError } = await supabaseAdmin
+      .from('shared_worlds')
+      .select(`
+        share_id,
+        world_snapshot,
+        world_name,
+        world_description,
+        page_count,
+        created_at,
+        views_count,
+        copies_count,
+        user_id
+      `)
+      .eq('share_url_slug', shareSlug)
+      .eq('is_active', true)
+      .or('expires_at.is.null,expires_at.gt.now()')
+      .single();
+
+    if (fetchError || !sharedWorld) {
+      if (fetchError?.code === 'PGRST116') {
+        throw {
+          status: 404,
+          error: 'Shared world not found',
+          message: 'This shared world does not exist or is no longer available'
+        };
+      }
+      console.error('Error fetching shared world:', fetchError);
+      throw {
+        status: 500,
+        error: 'Failed to fetch shared world',
+        message: 'An error occurred while loading the shared world'
+      };
+    }
+
+    // Record the view (async, don't wait for it)
+    if (clientIP) {
+      const ipHash = createHash('sha256')
+        .update(clientIP)
+        .digest('hex');
+
+      supabaseAdmin
+        .rpc('increment_share_views', {
+          p_share_id: sharedWorld.share_id,
+          p_viewer_ip_hash: ipHash,
+          p_viewer_user_id: userId || null
+        })
+        .then(result => {
+          if (result.error) {
+            console.error('Error recording view:', result.error);
+          }
+        });
+    }
+
+    return {
+      world: sharedWorld.world_snapshot,
+      metadata: {
+        name: sharedWorld.world_name,
+        description: sharedWorld.world_description,
+        pageCount: sharedWorld.page_count,
+        createdAt: sharedWorld.created_at,
+        viewsCount: sharedWorld.views_count,
+        copiesCount: sharedWorld.copies_count,
+        isOwner: userId === sharedWorld.user_id
+      }
+    };
+
+  } catch (error: any) {
+    if (error.status) {
+      throw error;
+    }
+    console.error('Get shared world error:', error);
+    throw {
+      status: 500,
+      error: 'Failed to fetch shared world',
+      message: 'An error occurred while loading the shared world'
+    };
+  }
+}
+
+/**
+ * Copy a shared world to the user's account
+ */
+export async function handleCopySharedWorld(
+  shareSlug: string,
+  newWorldId: string,
+  userId: string,
+  clientIP?: string
+) {
+  if (!supabaseAdmin) {
+    throw {
+      status: 500,
+      error: 'Service unavailable',
+      message: 'Sharing functionality is not configured'
+    };
+  }
+
+  try {
+    // Validate input
+    const validatedInput = copySharedWorldSchema.parse({
+      shareSlug,
+      newWorldId
+    });
+
+    // First, get the shared world
+    const { data: sharedWorld, error: fetchError } = await supabaseAdmin
+      .from('shared_worlds')
+      .select('share_id, world_snapshot, user_id')
+      .eq('share_url_slug', shareSlug)
+      .eq('is_active', true)
+      .or('expires_at.is.null,expires_at.gt.now()')
+      .single();
+
+    if (fetchError || !sharedWorld) {
+      if (fetchError?.code === 'PGRST116') {
+        throw {
+          status: 404,
+          error: 'Shared world not found',
+          message: 'This shared world does not exist or is no longer available'
+        };
+      }
+      console.error('Error fetching shared world for copy:', fetchError);
+      throw {
+        status: 500,
+        error: 'Failed to fetch shared world',
+        message: 'An error occurred while loading the shared world'
+      };
+    }
+
+    // Don't allow users to copy their own worlds
+    if (sharedWorld.user_id === userId) {
+      throw {
+        status: 400,
+        error: 'Cannot copy own world',
+        message: 'You cannot copy your own shared world'
+      };
+    }
+
+    // Create a modified world snapshot with the new ID
+    const copiedWorld = {
+      ...sharedWorld.world_snapshot,
+      id: newWorldId,
+      createdAt: Date.now(),
+      lastModified: Date.now(),
+      // Clear any sharing-related metadata from the copy
+      sharedAt: undefined,
+      shareUrl: undefined
+    };
+
+    // Record the copy (this also increments the copy counter)
+    const { error: copyError } = await supabaseAdmin
+      .rpc('record_world_copy', {
+        p_share_id: sharedWorld.share_id,
+        p_copied_by_user_id: userId,
+        p_new_world_id: newWorldId
+      });
+
+    if (copyError) {
+      console.error('Error recording world copy:', copyError);
+      // Check if it's a duplicate copy attempt
+      if (copyError.code === '23505') { // Unique constraint violation
+        throw {
+          status: 400,
+          error: 'Already copied',
+          message: 'You have already copied this world'
+        };
+      }
+      throw {
+        status: 500,
+        error: 'Failed to record copy',
+        message: 'An error occurred while copying the world'
+      };
+    }
+
+    return {
+      status: 'success',
+      copiedWorld: copiedWorld,
+      message: 'World copied successfully'
+    };
+
+  } catch (error: any) {
+    if (error instanceof z.ZodError) {
+      throw {
+        status: 400,
+        error: 'Invalid input',
+        message: error.errors[0]?.message || 'Invalid input data'
+      };
+    }
+    if (error.status) {
+      throw error;
+    }
+    console.error('Copy shared world error:', error);
+    throw {
+      status: 500,
+      error: 'Failed to copy world',
+      message: 'An error occurred while copying the shared world'
+    };
+  }
+}
+
+/**
+ * Get user's shared worlds (for management)
+ */
+export async function handleGetUserSharedWorlds(
+  userId: string,
+  clientIP?: string
+) {
+  if (!supabaseAdmin) {
+    throw {
+      status: 500,
+      error: 'Service unavailable',
+      message: 'Sharing functionality is not configured'
+    };
+  }
+
+  try {
+    const { data: sharedWorlds, error: fetchError } = await supabaseAdmin
+      .from('shared_worlds')
+      .select(`
+        share_id,
+        world_id,
+        share_url_slug,
+        world_name,
+        world_description,
+        page_count,
+        created_at,
+        views_count,
+        copies_count,
+        is_active,
+        expires_at
+      `)
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false });
+
+    if (fetchError) {
+      console.error('Error fetching user shared worlds:', fetchError);
+      throw {
+        status: 500,
+        error: 'Failed to fetch shared worlds',
+        message: 'An error occurred while loading your shared worlds'
+      };
+    }
+
+    const baseUrl = process.env.VITE_APP_URL || 'http://localhost:5173';
+    const sharesWithUrls = (sharedWorlds || []).map(share => ({
+      ...share,
+      shareUrl: `${baseUrl}/world/${share.share_url_slug}`
+    }));
+
+    return {
+      shares: sharesWithUrls
+    };
+
+  } catch (error: any) {
+    if (error.status) {
+      throw error;
+    }
+    console.error('Get user shared worlds error:', error);
+    throw {
+      status: 500,
+      error: 'Failed to fetch shared worlds',
+      message: 'An error occurred while loading your shared worlds'
+    };
+  }
+}
+
+/**
+ * Deactivate a shared world
+ */
+export async function handleDeactivateSharedWorld(
+  shareId: string,
+  userId: string,
+  clientIP?: string
+) {
+  if (!supabaseAdmin) {
+    throw {
+      status: 500,
+      error: 'Service unavailable',
+      message: 'Sharing functionality is not configured'
+    };
+  }
+
+  try {
+    const { data: updatedShare, error: updateError } = await supabaseAdmin
+      .from('shared_worlds')
+      .update({ is_active: false })
+      .eq('share_id', shareId)
+      .eq('user_id', userId) // Ensure user owns this share
+      .select('share_id')
+      .single();
+
+    if (updateError || !updatedShare) {
+      if (updateError?.code === 'PGRST116') {
+        throw {
+          status: 404,
+          error: 'Share not found',
+          message: 'This share does not exist or you do not have permission to modify it'
+        };
+      }
+      console.error('Error deactivating shared world:', updateError);
+      throw {
+        status: 500,
+        error: 'Failed to deactivate share',
+        message: 'An error occurred while deactivating the share'
+      };
+    }
+
+    return {
+      status: 'success',
+      message: 'Share deactivated successfully'
+    };
+
+  } catch (error: any) {
+    if (error.status) {
+      throw error;
+    }
+    console.error('Deactivate shared world error:', error);
+    throw {
+      status: 500,
+      error: 'Failed to deactivate share',
+      message: 'An error occurred while deactivating the share'
+    };
+  }
+}

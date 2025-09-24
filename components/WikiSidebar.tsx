@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
-import { Share } from 'lucide-react';
+import { Share, Copy } from 'lucide-react';
 import { WorldManager, AutoSaveInfo } from './WorldManager';
 import { UsageIndicator } from './UsageIndicator';
 import { WikiPageData } from './WikiGenerator';
@@ -25,6 +25,10 @@ interface WikiSidebarProps {
   onNewWorld: () => void;
   onImportWorld: (event: React.ChangeEvent<HTMLInputElement>) => void;
   onAutoSave: () => void;
+  onShareWorld?: () => void;
+  readOnlyMode?: boolean;
+  sharedWorldMetadata?: any;
+  onCopyWorld?: () => void;
 }
 
 export function WikiSidebar({
@@ -44,6 +48,10 @@ export function WikiSidebar({
   onNewWorld,
   onImportWorld,
   onAutoSave,
+  onShareWorld,
+  readOnlyMode = false,
+  sharedWorldMetadata,
+  onCopyWorld,
 }: WikiSidebarProps) {
   const [isEditingWorldName, setIsEditingWorldName] = useState(false);
   const [editedWorldName, setEditedWorldName] = useState('');
@@ -164,16 +172,29 @@ export function WikiSidebar({
                     onImportWorld={onImportWorld}
                     autoSaveInfo={autoSaveInfo}
                   />
-                  <div title="Publish World (Coming Soon)">
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      disabled
-                      className="text-glass-sidebar opacity-50 cursor-not-allowed"
-                    >
-                      <Share className="h-3 w-3" />
-                    </Button>
-                  </div>
+                  {!readOnlyMode && onShareWorld ? (
+                    <div title="Share World">
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={onShareWorld}
+                        className="text-glass-sidebar hover:text-glass-accent"
+                      >
+                        <Share className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  ) : readOnlyMode && onCopyWorld ? (
+                    <div title="Copy World to Your Account">
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={onCopyWorld}
+                        className="text-glass-accent hover:text-glass-accent/80"
+                      >
+                        <Copy className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  ) : null}
                 </div>
               </>
             )}

@@ -9,12 +9,31 @@ import { useAuth } from '@clerk/clerk-react';
 import { NavigationBar } from './NavigationBar';
 import { WelcomeScreen } from './WelcomeScreen';
 import { WikiSidebar } from './WikiSidebar';
+import { ShareWorldDialog } from './ShareWorldDialog';
+import { AuthPromptDialog } from './AuthPromptDialog';
 import { useApiKeyManagement } from '../hooks/useApiKeyManagement';
 import { useWorldManagement } from '../hooks/useWorldManagement';
 import { usePageGeneration } from '../hooks/usePageGeneration';
 import { World } from './WorldModel';
+import type { SharedWorldData } from '../lib/sharedWorldService';
 
-export function WikiInterface() {
+interface WikiInterfaceProps {
+  initialWorld?: World;
+  sharedWorldMetadata?: SharedWorldData['metadata'];
+  readOnlyMode?: boolean;
+  onCopyWorld?: () => void;
+  onBackToHome?: () => void;
+  shareSlug?: string;
+}
+
+export function WikiInterface({
+  initialWorld,
+  sharedWorldMetadata,
+  readOnlyMode = false,
+  onCopyWorld,
+  onBackToHome,
+  shareSlug
+}: WikiInterfaceProps = {}) {
   const [pages, setPages] = useState<Map<string, WikiPageData>>(new Map());
   const [currentPageId, setCurrentPageId] = useState<string | null>(null);
   const [seedSentence, setSeedSentence] = useState('');
@@ -24,6 +43,9 @@ export function WikiInterface() {
   const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(false);
   const [currentUsageInfo, setCurrentUsageInfo] = useState<any>(null);
   const [showAbout, setShowAbout] = useState<boolean>(false);
+  const [isShareDialogOpen, setIsShareDialogOpen] = useState<boolean>(false);
+  const [showAuthPrompt, setShowAuthPrompt] = useState<boolean>(false);
+  const [authPromptAction, setAuthPromptAction] = useState<string>('');
   const { isLoaded: isAuthLoaded, isSignedIn } = useAuth(); // Used in hooks
 
   // Custom hooks
@@ -64,6 +86,28 @@ export function WikiInterface() {
     setIsSidebarOpen(window.innerWidth >= 1024);
   }, []);
 
+  // Load initial world for shared world viewing
+  useEffect(() => {
+    if (initialWorld) {
+      worldManagement.setCurrentWorld(initialWorld);
+
+      // Set up the pages
+      const pagesMap = new Map(Object.entries(initialWorld.pages || {}));
+      setPages(pagesMap);
+
+      // Set current page (first page if available)
+      if (initialWorld.currentPageId) {
+        setCurrentPageId(initialWorld.currentPageId);
+      } else if (pagesMap.size > 0) {
+        const firstPageId = pagesMap.keys().next().value;
+        setCurrentPageId(firstPageId || null);
+      }
+
+      // Set page history
+      setPageHistory(initialWorld.pageHistory || []);
+    }
+  }, [initialWorld, worldManagement]);
+
   const handleUpgradeRequested = () => {
     if (apiKeyManagement.enableUserApiKeys) {
       apiKeyManagement.setIsApiDialogOpen(true);
@@ -87,6 +131,49 @@ export function WikiInterface() {
   const handleHome = () => {
     worldManagement.handleNewWorld();
     setSeedSentence('');
+  };
+
+  const handleShareWorld = () => {
+    if (!isSignedIn) {
+      toast.error('Please sign in to share worlds');
+      return;
+    }
+    setIsShareDialogOpen(true);
+  };
+
+  const handleAuthPrompt = (action: string) => {
+    setAuthPromptAction(action);
+    setShowAuthPrompt(true);
+  };
+
+  const handleGenerateWithAuth = (term: string, context: string) => {
+    if (!isSignedIn && readOnlyMode) {
+      handleAuthPrompt('generate new pages');
+      return;
+    }
+    if (pageGeneration.handleTermClick) {
+      pageGeneration.handleTermClick(term, context);
+    }
+  };
+
+  const handleAddSectionWithAuth = (pageId: string, section: any) => {
+    if (!isSignedIn && readOnlyMode) {
+      handleAuthPrompt('add new sections');
+      return;
+    }
+    if (pageGeneration.handleSectionAdded) {
+      pageGeneration.handleSectionAdded(pageId, section);
+    }
+  };
+
+  const handleGenerateImageWithAuth = (pageId: string, imageUrl: string) => {
+    if (!isSignedIn && readOnlyMode) {
+      handleAuthPrompt('generate images');
+      return;
+    }
+    if (pageGeneration.handleImageGenerated) {
+      pageGeneration.handleImageGenerated(pageId, imageUrl);
+    }
   };
 
   const handleGenerateFirstPage = () => pageGeneration.generateFirstPageWithSeed(seedSentence);
@@ -187,6 +274,10 @@ export function WikiInterface() {
               onNewWorld={worldManagement.handleNewWorld}
               onImportWorld={worldManagement.handleImportWorld}
               onAutoSave={worldManagement.performAutoSave}
+              onShareWorld={readOnlyMode ? undefined : handleShareWorld}
+              readOnlyMode={readOnlyMode}
+              sharedWorldMetadata={sharedWorldMetadata}
+              onCopyWorld={onCopyWorld}
             />
 
             {/* Main Content Area */}
@@ -205,16 +296,19 @@ export function WikiInterface() {
               )}
               <WikiPage
                 page={pageGeneration.streamingPageData || currentPage}
-                onTermClick={pageGeneration.handleTermClick}
+                onTermClick={readOnlyMode ? handleGenerateWithAuth : pageGeneration.handleTermClick}
                 worldbuildingHistory={worldManagement.currentWorld.worldbuilding}
                 enableUserApiKeys={apiKeyManagement.enableUserApiKeys}
                 isStreaming={pageGeneration.isStreaming}
                 streamingData={pageGeneration.streamingPageData}
                 onUsageUpdate={setCurrentUsageInfo}
                 generatedImageUrl={currentPage?.imageUrl || undefined}
-                onImageGenerated={pageGeneration.handleImageGenerated}
-                onSectionAdded={pageGeneration.handleSectionAdded}
+                onImageGenerated={readOnlyMode ? handleGenerateImageWithAuth : pageGeneration.handleImageGenerated}
+                onSectionAdded={readOnlyMode ? handleAddSectionWithAuth : pageGeneration.handleSectionAdded}
                 worldId={worldManagement.currentWorld.id}
+                readOnlyMode={readOnlyMode}
+                sharedWorldMetadata={sharedWorldMetadata}
+                onCopyWorld={onCopyWorld}
               />
             </div>
           </>
@@ -228,6 +322,22 @@ export function WikiInterface() {
         // This will be rendered by the NavigationBar or WelcomeScreen components
         null
       )}
+
+      {/* Share World Dialog */}
+      <ShareWorldDialog
+        world={worldManagement.currentWorld}
+        isOpen={isShareDialogOpen}
+        onOpenChange={setIsShareDialogOpen}
+      />
+
+      {/* Authentication Prompt Dialog */}
+      <AuthPromptDialog
+        isOpen={showAuthPrompt}
+        onOpenChange={setShowAuthPrompt}
+        action={authPromptAction}
+        onCopyWorld={onCopyWorld}
+        sharedWorldMetadata={sharedWorldMetadata}
+      />
     </div>
   );
 }

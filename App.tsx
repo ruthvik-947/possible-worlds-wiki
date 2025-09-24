@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import {
   SignedIn,
   SignedOut,
@@ -5,9 +6,67 @@ import {
   SignUpButton
 } from '@clerk/clerk-react';
 import { WikiInterface } from './components/WikiInterface';
+import { SharedWorldView } from './components/SharedWorldView';
 import { Analytics } from "@vercel/analytics/react"
 
 export default function App() {
+  const [currentRoute, setCurrentRoute] = useState<{
+    type: 'home' | 'shared';
+    shareSlug?: string;
+  }>({ type: 'home' });
+
+  // Simple URL parsing for shared world routes
+  useEffect(() => {
+    const path = window.location.pathname;
+    const sharedWorldMatch = path.match(/^\/world\/([a-zA-Z0-9]+)$/);
+
+    if (sharedWorldMatch) {
+      setCurrentRoute({
+        type: 'shared',
+        shareSlug: sharedWorldMatch[1]
+      });
+    } else {
+      setCurrentRoute({ type: 'home' });
+    }
+
+    // Handle browser back/forward
+    const handlePopState = () => {
+      const newPath = window.location.pathname;
+      const newMatch = newPath.match(/^\/world\/([a-zA-Z0-9]+)$/);
+
+      if (newMatch) {
+        setCurrentRoute({
+          type: 'shared',
+          shareSlug: newMatch[1]
+        });
+      } else {
+        setCurrentRoute({ type: 'home' });
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
+  const handleBackToHome = () => {
+    window.history.pushState({}, '', '/');
+    setCurrentRoute({ type: 'home' });
+  };
+
+  // If viewing a shared world, show SharedWorldView for both signed in and signed out users
+  if (currentRoute.type === 'shared' && currentRoute.shareSlug) {
+    return (
+      <div className="min-h-screen bg-background text-foreground flex flex-col">
+        <main className="flex-1">
+          <SharedWorldView
+            shareSlug={currentRoute.shareSlug}
+            onBackToHome={handleBackToHome}
+          />
+          <Analytics />
+        </main>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background text-foreground flex flex-col">

@@ -23,6 +23,9 @@ interface WikiPageProps {
   onImageGenerated?: (pageId: string, imageUrl: string) => void;
   onSectionAdded?: (pageId: string, section: { title: string; content: string }) => void;
   worldId?: string;
+  readOnlyMode?: boolean;
+  sharedWorldMetadata?: any;
+  onCopyWorld?: () => void;
 }
 
 // Infobox component for reuse

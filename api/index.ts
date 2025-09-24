@@ -29,7 +29,17 @@ if (process.env.NODE_ENV === 'production' && process.env.SENTRY_DSN) {
 }
 
 // Import these AFTER loading environment variables
-import { handleGenerate, handleGenerateSection, handleImageGeneration, handleStoreApiKey } from '../lib/api-utils/shared-handlers.js';
+import {
+  handleGenerate,
+  handleGenerateSection,
+  handleImageGeneration,
+  handleStoreApiKey,
+  handleShareWorld,
+  handleGetSharedWorld,
+  handleCopySharedWorld,
+  handleGetUserSharedWorlds,
+  handleDeactivateSharedWorld
+} from '../lib/api-utils/shared-handlers.js';
 import { hasApiKey } from '../lib/api-utils/apiKeyVault.js';
 // Removed: Using worldsAuth.ts functions instead
 import { listWorldsAuth, saveWorldAuth, getWorldAuth, deleteWorldAuth, testRLSIntegration } from '../lib/api-utils/worldsAuth.js';
@@ -403,6 +413,161 @@ app.get('/api/test-rls', requireAuth(), async (req: any, res: any) => {
     res.status(500).json({
       error: 'RLS test failed',
       details: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
+// ===== WORLD SHARING ENDPOINTS =====
+
+// Share a world - POST /api/worlds/share
+app.post('/api/worlds/share', worldRateLimit, requireAuth(), async (req: any, res: any) => {
+  const { worldId, worldSnapshot, expiresAt } = req.body;
+  const userId = req.auth()?.userId;
+
+  if (!userId) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  // Set up streaming response headers
+  res.setHeader('Content-Type', 'text/plain');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.setHeader('X-Streaming', 'true');
+
+  try {
+    await handleShareWorld(
+      worldId,
+      worldSnapshot,
+      userId,
+      expiresAt,
+      'localhost', // clientIP
+      (data) => res.write(data),
+      () => res.end()
+    );
+  } catch (error: any) {
+    console.error('Share world error:', error);
+    Sentry.captureException(error, { tags: { operation: 'share_world' } });
+
+    if (!res.headersSent) {
+      res.status(error.status || 500).json({
+        error: error.error || 'Failed to share world',
+        message: error.message || 'An error occurred while sharing the world'
+      });
+    } else {
+      res.write('data: ' + JSON.stringify({
+        status: 'error',
+        error: error.error || 'Failed to share world',
+        message: error.message || 'An error occurred while sharing the world'
+      }) + '\n\n');
+      res.end();
+    }
+  }
+});
+
+// Get a shared world - GET /api/shared/:shareSlug
+app.get('/api/shared/:shareSlug', async (req: any, res: any) => {
+  const { shareSlug } = req.params;
+  const userId = req.auth()?.userId; // Optional - may be unauthenticated
+
+  try {
+    const sharedWorldData = await handleGetSharedWorld(
+      shareSlug,
+      'localhost', // clientIP
+      userId
+    );
+
+    res.json(sharedWorldData);
+  } catch (error: any) {
+    console.error('Get shared world error:', error);
+    Sentry.captureException(error, { tags: { operation: 'get_shared_world' } });
+
+    res.status(error.status || 500).json({
+      error: error.error || 'Failed to fetch shared world',
+      message: error.message || 'An error occurred while loading the shared world'
+    });
+  }
+});
+
+// Copy a shared world - POST /api/shared/:shareSlug/copy
+app.post('/api/shared/:shareSlug/copy', worldRateLimit, requireAuth(), async (req: any, res: any) => {
+  const { shareSlug } = req.params;
+  const { newWorldId } = req.body;
+  const userId = req.auth()?.userId;
+
+  if (!userId) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  try {
+    const copyResult = await handleCopySharedWorld(
+      shareSlug,
+      newWorldId,
+      userId,
+      'localhost' // clientIP
+    );
+
+    res.json(copyResult);
+  } catch (error: any) {
+    console.error('Copy shared world error:', error);
+    Sentry.captureException(error, { tags: { operation: 'copy_shared_world' } });
+
+    res.status(error.status || 500).json({
+      error: error.error || 'Failed to copy world',
+      message: error.message || 'An error occurred while copying the shared world'
+    });
+  }
+});
+
+// Get user's shared worlds - GET /api/worlds/shared
+app.get('/api/worlds/shared', worldRateLimit, requireAuth(), async (req: any, res: any) => {
+  const userId = req.auth()?.userId;
+
+  if (!userId) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  try {
+    const userShares = await handleGetUserSharedWorlds(
+      userId,
+      'localhost' // clientIP
+    );
+
+    res.json(userShares);
+  } catch (error: any) {
+    console.error('Get user shared worlds error:', error);
+    Sentry.captureException(error, { tags: { operation: 'get_user_shared_worlds' } });
+
+    res.status(error.status || 500).json({
+      error: error.error || 'Failed to fetch shared worlds',
+      message: error.message || 'An error occurred while loading your shared worlds'
+    });
+  }
+});
+
+// Deactivate a shared world - DELETE /api/worlds/share/:shareId
+app.delete('/api/worlds/share/:shareId', worldRateLimit, requireAuth(), async (req: any, res: any) => {
+  const { shareId } = req.params;
+  const userId = req.auth()?.userId;
+
+  if (!userId) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  try {
+    const deactivateResult = await handleDeactivateSharedWorld(
+      shareId,
+      userId,
+      'localhost' // clientIP
+    );
+
+    res.json(deactivateResult);
+  } catch (error: any) {
+    console.error('Deactivate shared world error:', error);
+    Sentry.captureException(error, { tags: { operation: 'deactivate_shared_world' } });
+
+    res.status(error.status || 500).json({
+      error: error.error || 'Failed to deactivate share',
+      message: error.message || 'An error occurred while deactivating the share'
     });
   }
 });
