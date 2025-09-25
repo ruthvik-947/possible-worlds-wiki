@@ -1,5 +1,15 @@
 {
   "buildCommand": "npm run build",
   "devCommand": "npm run dev",
-  "installCommand": "npm install"
+  "installCommand": "npm install",
+  "rewrites": [
+    {
+      "source": "/world/:shareSlug",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/((?!api|_next|favicon.ico|.*\\..*).*)",
+      "destination": "/index.html"
+    }
+  ]
 }
