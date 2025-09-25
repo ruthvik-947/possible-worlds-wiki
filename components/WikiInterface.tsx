@@ -106,13 +106,13 @@ export function WikiInterface({
       // Set page history
       setPageHistory(initialWorld.pageHistory || []);
     }
-  }, [initialWorld, worldManagement]);
+  }, [initialWorld, worldManagement.setCurrentWorld, setPages, setCurrentPageId, setPageHistory]);
 
   const handleUpgradeRequested = () => {
     if (apiKeyManagement.enableUserApiKeys) {
       apiKeyManagement.setIsApiDialogOpen(true);
     } else {
-      toast.info('To get unlimited usage, enable user API keys in your environment configuration and provide your own OpenAI API key.', {
+      toast.info('Sign up or sign in first to set your API key.', {
         duration: 8000
       });
     }
@@ -129,6 +129,11 @@ export function WikiInterface({
   };
 
   const handleHome = () => {
+    // If user is not signed in and in read-only mode, show auth prompt
+    if (!isSignedIn && readOnlyMode) {
+      handleAuthPrompt('access home');
+      return;
+    }
     worldManagement.handleNewWorld();
     setSeedSentence('');
   };
@@ -147,10 +152,26 @@ export function WikiInterface({
   };
 
   const handleGenerateWithAuth = (term: string, context: string) => {
+    // Check if page already exists (for navigation in read-only mode)
+    const existingPageId = Array.from(pages.keys()).find(id =>
+      pages.get(id)?.title.toLowerCase() === term.toLowerCase()
+    );
+
+    if (existingPageId) {
+      // Navigate to existing page (allowed in read-only mode)
+      if (currentPageId) {
+        setPageHistory(prev => [...prev, currentPageId]);
+      }
+      setCurrentPageId(existingPageId);
+      return;
+    }
+
+    // Only block new page generation in read-only mode
     if (!isSignedIn && readOnlyMode) {
       handleAuthPrompt('generate new pages');
       return;
     }
+
     if (pageGeneration.handleTermClick) {
       pageGeneration.handleTermClick(term, context);
     }

@@ -31,24 +31,24 @@ export function SharedWorldView({ shareSlug, onBackToHome }: SharedWorldViewProp
 
   // Load the shared world on mount
   useEffect(() => {
+    const loadSharedWorld = async () => {
+      setState(prev => ({ ...prev, loading: true, error: null }));
+
+      try {
+        const sharedWorldData = await getSharedWorld(shareSlug);
+        setState(prev => ({ ...prev, loading: false, sharedWorldData }));
+      } catch (error: any) {
+        console.error('Failed to load shared world:', error);
+        setState(prev => ({
+          ...prev,
+          loading: false,
+          error: error.message || 'Failed to load shared world'
+        }));
+      }
+    };
+
     loadSharedWorld();
   }, [shareSlug]);
-
-  const loadSharedWorld = async () => {
-    setState(prev => ({ ...prev, loading: true, error: null }));
-
-    try {
-      const sharedWorldData = await getSharedWorld(shareSlug);
-      setState(prev => ({ ...prev, loading: false, sharedWorldData }));
-    } catch (error: any) {
-      console.error('Failed to load shared world:', error);
-      setState(prev => ({
-        ...prev,
-        loading: false,
-        error: error.message || 'Failed to load shared world'
-      }));
-    }
-  };
 
   const handleCopyWorld = async () => {
     if (!isSignedIn || !state.sharedWorldData) {

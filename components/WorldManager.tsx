@@ -286,7 +286,7 @@ export function WorldManager({
             disabled
             className="w-full justify-start text-glass-sidebar opacity-50 cursor-not-allowed">
             <Speaker className="mr-2 h-3 w-3" />
-            Set Inspirations (Soon)
+            Set LLM Model and Inspirations (Soon)
           </Button>
         </div>
       </div>

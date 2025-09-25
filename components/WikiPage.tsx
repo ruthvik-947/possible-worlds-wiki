@@ -155,7 +155,7 @@ export function WikiPage({ page, onTermClick, worldbuildingHistory, enableUserAp
   const requireAuthToken = useCallback(async () => {
     const token = await getToken({ skipCache: true });
     if (!token) {
-      throw new Error('Unable to retrieve authentication token from Clerk. Please sign in again.');
+      throw new Error('Unable to verify authentication. Please sign in again.');
     }
     return token;
   }, [getToken]);
