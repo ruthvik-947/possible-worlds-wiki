@@ -73,20 +73,60 @@ export default function App() {
 
       <main className="flex-1">
         <SignedOut>
-          <div className="relative flex min-h-[calc(100vh-4rem)] w-full items-center justify-center overflow-hidden bg-glass-bg">
+          <div className="relative flex min-h-screen w-full items-center justify-center overflow-hidden bg-glass-bg py-12">
             <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(95,175,218,0.15),transparent_65%)]" aria-hidden="true" />
-            <div className="relative z-10 flex w-full max-w-2xl flex-col items-center gap-8 px-6 text-center">
-              <h1 className="font-serif text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-medium text-glass-text mb-6 tracking-wide">
-            PossibleWorldWikis
-              </h1>
-              <div className="flex flex-col items-center gap-3 sm:flex-row">
+            <div className="relative z-10 flex w-full max-w-6xl flex-col items-center px-6 text-center space-y-12">
+
+              {/* Title */}
+              <div>
+                <h1 className="font-serif text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-medium text-glass-text tracking-wide">
+                  PossibleWorldWikis
+                </h1>
+              </div>
+
+              {/* Demo Video */}
+              <div className="w-full max-w-4xl">
+                <div className="relative pb-[56.25%] h-0 overflow-hidden rounded-lg shadow-lg">
+                  <iframe
+                    src="https://www.loom.com/embed/dc2016054fde4d1ea1fc3e87e988dabf"
+                    frameBorder="0"
+                    allowFullScreen
+                    className="absolute top-0 left-0 w-full h-full"
+                    title="PossibleWorldWikis Demo"
+                  ></iframe>
+                </div>
+
+                {/* Demo World Link */}
+                <div className="mt-8 text-center">
+                  <span className="text-glass-text text-base">
+                    <a
+                      href="https://possibleworldwikis.com/world/c5qt1nmgdr"
+                      className="text-glass-accent hover:text-glass-accent/80 transition-colors underline"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      Explore
+                    </a>
+                    {" "}a demo world
+                  </span>
+                </div>
+              </div>
+
+              {/* Auth Buttons */}
+              <div className="flex flex-col items-center gap-6 sm:flex-row sm:gap-8">
                 <SignUpButton mode="modal">
-                  <button className="rounded-full bg-glass-text px-6 py-2 text-sm font-semibold text-glass-bg transition hover:bg-glass-text/90">
+                  <button
+                    className="rounded-full bg-glass-text text-sm font-semibold text-glass-bg transition hover:bg-glass-text/90"
+                    style={{ padding: '12px 48px' }}
+                  >
                     Create an account
                   </button>
                 </SignUpButton>
                 <SignInButton mode="modal">
-                  <button className="rounded-full border border-glass-divider px-6 py-2 text-sm font-semibold text-glass-text transition hover:bg-glass-divider/40">
+                  <button
+                    className="rounded-full border border-glass-divider text-sm font-semibold text-glass-text transition hover:bg-glass-divider/40"
+                    style={{ padding: '12px 48px' }}
+                  >
                     Sign in
                   </button>
                 </SignInButton>
