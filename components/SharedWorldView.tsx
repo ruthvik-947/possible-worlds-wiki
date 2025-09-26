@@ -7,6 +7,7 @@ import { useAuth } from '@clerk/clerk-react';
 import { toast } from 'sonner';
 import type { World } from './WorldModel';
 import type { SharedWorldData } from '../lib/sharedWorldService';
+import * as Sentry from '@sentry/react';
 
 interface SharedWorldViewProps {
   shareSlug: string;
@@ -38,7 +39,16 @@ export function SharedWorldView({ shareSlug, onBackToHome }: SharedWorldViewProp
         const sharedWorldData = await getSharedWorld(shareSlug);
         setState(prev => ({ ...prev, loading: false, sharedWorldData }));
       } catch (error: any) {
-        console.error('Failed to load shared world:', error);
+        if (import.meta.env.PROD) {
+          Sentry.captureException(error, {
+            tags: {
+              operation: 'load_shared_world',
+              shareSlug: shareSlug
+            }
+          });
+        } else {
+          console.error('Failed to load shared world:', error);
+        }
         setState(prev => ({
           ...prev,
           loading: false,
@@ -69,7 +79,16 @@ export function SharedWorldView({ shareSlug, onBackToHome }: SharedWorldViewProp
       setState(prev => ({ ...prev, copiedWorld: result.copiedWorld }));
       toast.success('World copied to your account!');
     } catch (error: any) {
-      console.error('Failed to copy world:', error);
+      if (import.meta.env.PROD) {
+        Sentry.captureException(error, {
+          tags: {
+            operation: 'copy_shared_world',
+            shareSlug: shareSlug
+          }
+        });
+      } else {
+        console.error('Failed to copy world:', error);
+      }
       toast.error(error.message || 'Failed to copy world');
     }
   };

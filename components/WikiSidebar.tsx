@@ -72,7 +72,7 @@ export function WikiSidebar({
       ${isSidebarOpen ? 'translate-x-0 lg:translate-x-0 lg:w-[280px]' : '-translate-x-full lg:translate-x-0 lg:w-0 lg:border-r-0'}`}
     >
       <div className="flex-1 p-6 flex flex-col min-h-0">
-        {(!enableUserApiKeys || !hasUserApiKey) && !readOnlyMode && (
+        {(!enableUserApiKeys || !hasUserApiKey) && (
           <div className="mb-4">
             <UsageIndicator
               usageInfo={currentUsageInfo}

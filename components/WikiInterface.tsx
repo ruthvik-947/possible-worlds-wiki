@@ -15,6 +15,7 @@ import { useApiKeyManagement } from '../hooks/useApiKeyManagement';
 import { useWorldManagement } from '../hooks/useWorldManagement';
 import { usePageGeneration } from '../hooks/usePageGeneration';
 import { World } from './WorldModel';
+import { config } from '../lib/config';
 import type { SharedWorldData } from '../lib/sharedWorldService';
 
 interface WikiInterfaceProps {
@@ -107,6 +108,30 @@ export function WikiInterface({
       setPageHistory(initialWorld.pageHistory || []);
     }
   }, [initialWorld, worldManagement.setCurrentWorld, setPages, setCurrentPageId, setPageHistory]);
+
+  // Fetch usage info for signed-in users without API keys when entering shared worlds
+  useEffect(() => {
+    if (readOnlyMode && isSignedIn && !apiKeyManagement.hasUserApiKey && !currentUsageInfo) {
+      // Fetch usage info since this signed-in user doesn't have an API key
+      const fetchUsageInfo = async () => {
+        try {
+          const token = await apiKeyManagement.requireAuthToken();
+          const response = await fetch(config.endpoints.usage, {
+            headers: {
+              Authorization: `Bearer ${token}`
+            }
+          });
+          if (response.ok) {
+            const data = await response.json();
+            setCurrentUsageInfo(data);
+          }
+        } catch (error) {
+          console.error('Failed to fetch usage info in shared world:', error);
+        }
+      };
+      fetchUsageInfo();
+    }
+  }, [readOnlyMode, isSignedIn, apiKeyManagement.hasUserApiKey, apiKeyManagement.requireAuthToken]);
 
   const handleUpgradeRequested = () => {
     if (apiKeyManagement.enableUserApiKeys) {

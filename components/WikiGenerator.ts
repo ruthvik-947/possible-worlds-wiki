@@ -1,5 +1,6 @@
 import { WorldbuildingRecord } from './WorldbuildingHistory';
 import { config } from '../lib/config';
+import * as Sentry from '@sentry/react';
 
 export interface WikiPageData {
   id: string;
@@ -112,7 +113,9 @@ export async function generateWikiPage(
                 const jsonStr = line.substring(6).trim(); // Remove 'data: ' and trim
 
                 if (!jsonStr) {
-                  console.warn('Empty JSON string after data: prefix');
+                  if (!import.meta.env.PROD) {
+                    console.warn('Empty JSON string after data: prefix');
+                  }
                   continue;
                 }
 
@@ -130,9 +133,11 @@ export async function generateWikiPage(
                   finalData = parsedObj;
                 }
               } catch (parseError) {
-                console.warn('Failed to parse streaming data:', parseError);
-                console.warn('Raw line:', line);
-                console.warn('JSON string:', line.substring(6));
+                if (!import.meta.env.PROD) {
+                  console.warn('Failed to parse streaming data:', parseError);
+                  console.warn('Raw line:', line);
+                  console.warn('JSON string:', line.substring(6));
+                }
                 continue;
               }
             }
@@ -154,7 +159,17 @@ export async function generateWikiPage(
       return data;
     }
   } catch (error) {
-    console.error("Error generating wiki page:", error);
+    if (import.meta.env.PROD) {
+      Sentry.captureException(error, {
+        tags: {
+          operation: 'generate_wiki_page',
+          input: input.substring(0, 50),
+          type: type
+        }
+      });
+    } else {
+      console.error("Error generating wiki page:", error);
+    }
     throw error;
   }
 }
@@ -259,7 +274,9 @@ export async function generateSectionContent(
                   finalData = parsedObj;
                 }
               } catch (parseError) {
-                console.warn('Failed to parse streaming section data:', parseError);
+                if (!import.meta.env.PROD) {
+                  console.warn('Failed to parse streaming section data:', parseError);
+                }
                 continue;
               }
             }
@@ -281,7 +298,17 @@ export async function generateSectionContent(
       return data;
     }
   } catch (error) {
-    console.error("Error generating section content:", error);
+    if (import.meta.env.PROD) {
+      Sentry.captureException(error, {
+        tags: {
+          operation: 'generate_section_content',
+          sectionTitle: sectionTitle,
+          pageTitle: pageTitle
+        }
+      });
+    } else {
+      console.error("Error generating section content:", error);
+    }
     throw error;
   }
 }
@@ -375,7 +402,9 @@ export async function generatePageImage(
                 }
               } catch (parseError) {
                 const errorMessage = parseError instanceof Error ? parseError.message : String(parseError);
-                console.warn('Failed to parse streaming image data:', errorMessage.substring(0, 100));
+                if (!import.meta.env.PROD) {
+                  console.warn('Failed to parse streaming image data:', errorMessage.substring(0, 100));
+                }
                 continue;
               }
             }
@@ -393,7 +422,9 @@ export async function generatePageImage(
               }
             }
           } catch (parseError) {
-            console.warn('Failed to parse final buffered data:', parseError);
+            if (!import.meta.env.PROD) {
+              console.warn('Failed to parse final buffered data:', parseError);
+            }
           }
         }
 
@@ -417,7 +448,17 @@ export async function generatePageImage(
       };
     }
   } catch (error) {
-    console.error("Error generating image:", error);
+    if (import.meta.env.PROD) {
+      Sentry.captureException(error, {
+        tags: {
+          operation: 'generate_page_image',
+          title: title,
+          description: description.substring(0, 100)
+        }
+      });
+    } else {
+      console.error("Error generating image:", error);
+    }
     throw error;
   }
 }

@@ -8,6 +8,7 @@ import { WorldbuildingRecord } from './WorldbuildingHistory';
 import { Button } from './ui/button';
 import { toast } from 'sonner';
 import { useAuth } from '@clerk/clerk-react';
+import * as Sentry from '@sentry/react';
 
 const SPECIAL_REGEX_CHARS = /[\\^$.*+?()[\]{}|]/g;
 
@@ -222,7 +223,13 @@ export function WikiPage({ page, onTermClick, worldbuildingHistory, enableUserAp
     try {
       authToken = await requireAuthToken();
     } catch (authError) {
-      console.error('Failed to fetch auth token for section generation:', authError);
+      if (import.meta.env.PROD) {
+        Sentry.captureException(authError, {
+          tags: { operation: 'fetch_auth_token_section' }
+        });
+      } else {
+        console.error('Failed to fetch auth token for section generation:', authError);
+      }
       toast.error(authError instanceof Error ? authError.message : 'Authentication error. Please sign in again.');
       setIsGenerating(false);
       return;
@@ -252,7 +259,17 @@ export function WikiPage({ page, onTermClick, worldbuildingHistory, enableUserAp
         onUsageUpdate(newSection.usageInfo);
       }
     } catch (error: any) {
-      console.error('Failed to generate section:', error);
+      if (import.meta.env.PROD) {
+        Sentry.captureException(error, {
+          tags: {
+            operation: 'generate_section',
+            pageTitle: page.title,
+            sectionTitle: sectionTitle
+          }
+        });
+      } else {
+        console.error('Failed to generate section:', error);
+      }
       if (error instanceof Error && error.message.includes('authentication token')) {
         toast.error(error.message);
       } else if (error.code === 'RATE_LIMIT_EXCEEDED' || error.code === 'API_KEY_REQUIRED') {
@@ -275,7 +292,13 @@ export function WikiPage({ page, onTermClick, worldbuildingHistory, enableUserAp
     try {
       authToken = await requireAuthToken();
     } catch (authError) {
-      console.error('Failed to fetch auth token for image generation:', authError);
+      if (import.meta.env.PROD) {
+        Sentry.captureException(authError, {
+          tags: { operation: 'fetch_auth_token_image' }
+        });
+      } else {
+        console.error('Failed to fetch auth token for image generation:', authError);
+      }
       toast.error(authError instanceof Error ? authError.message : 'Authentication error. Please sign in again.');
       setIsGeneratingImage(false);
       setImageProgress(undefined);
@@ -306,7 +329,16 @@ export function WikiPage({ page, onTermClick, worldbuildingHistory, enableUserAp
 
       toast.success('Image generated successfully!');
     } catch (error: any) {
-      console.error('Failed to generate image:', error);
+      if (import.meta.env.PROD) {
+        Sentry.captureException(error, {
+          tags: {
+            operation: 'generate_image',
+            pageTitle: page.title
+          }
+        });
+      } else {
+        console.error('Failed to generate image:', error);
+      }
       if (error instanceof Error && error.message.includes('authentication token')) {
         toast.error(error.message);
       } else if (error.code === 'RATE_LIMIT_EXCEEDED' || error.code === 'API_KEY_REQUIRED') {

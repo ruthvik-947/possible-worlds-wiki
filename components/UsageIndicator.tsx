@@ -4,6 +4,7 @@ import { Progress } from './ui/progress';
 import { Key, Zap, AlertTriangle } from 'lucide-react';
 import { config } from '../lib/config';
 import { useAuth } from '@clerk/clerk-react';
+import * as Sentry from '@sentry/react';
 
 interface UsageInfo {
   hasUserApiKey: boolean;
@@ -46,7 +47,13 @@ export function UsageIndicator({ onUpgradeRequested, usageInfo: propUsageInfo, h
         setUsageInfo(data);
       }
     } catch (error) {
-      console.error('Failed to fetch usage info:', error);
+      if (import.meta.env.PROD) {
+        Sentry.captureException(error, {
+          tags: { operation: 'fetch_usage_info' }
+        });
+      } else {
+        console.error('Failed to fetch usage info:', error);
+      }
     } finally {
       setIsLoading(false);
     }

@@ -5,6 +5,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { FolderOpen, Trash2, FileText, AlertCircle, Upload, RefreshCw, Globe, Speaker } from 'lucide-react';
 import { World } from './WorldModel';
 import { toast } from 'sonner';
+import * as Sentry from '@sentry/react';
 import {
   fetchWorldSummaries,
   fetchWorldById,
@@ -83,7 +84,13 @@ export function WorldManager({
       const worlds = await fetchWorldSummaries(token);
       setSavedWorlds(worlds);
     } catch (error) {
-      console.error('Failed to load worlds:', error);
+      if (import.meta.env.PROD) {
+        Sentry.captureException(error, {
+          tags: { operation: 'load_worlds' }
+        });
+      } else {
+        console.error('Failed to load worlds:', error);
+      }
       toast.error('Failed to load your saved worlds.');
     } finally {
       setIsWorking(false);
@@ -120,7 +127,16 @@ export function WorldManager({
       setIsDialogOpen(false);
       toast.success(`World "${record.world.name}" loaded`);
     } catch (error: any) {
-      console.error('Failed to load world:', error);
+      if (import.meta.env.PROD) {
+        Sentry.captureException(error, {
+          tags: {
+            operation: 'load_world',
+            worldId: worldId
+          }
+        });
+      } else {
+        console.error('Failed to load world:', error);
+      }
       toast.error(error?.message || 'Failed to load world.');
     } finally {
       setIsWorking(false);
@@ -140,7 +156,16 @@ export function WorldManager({
       toast.success(`World "${worldName}" deleted`);
       await refreshWorldsList();
     } catch (error: any) {
-      console.error('Failed to delete world:', error);
+      if (import.meta.env.PROD) {
+        Sentry.captureException(error, {
+          tags: {
+            operation: 'delete_world',
+            worldId: worldId
+          }
+        });
+      } else {
+        console.error('Failed to delete world:', error);
+      }
       toast.error(error?.message || 'Failed to delete world.');
     } finally {
       setIsWorking(false);

@@ -7,6 +7,7 @@ import { toast } from 'sonner';
 import { World } from './WorldModel';
 import { useAuth } from '@clerk/clerk-react';
 import { config } from '../lib/config';
+import * as Sentry from '@sentry/react';
 
 interface ShareWorldDialogProps {
   world: World;
@@ -70,7 +71,16 @@ export function ShareWorldDialog({ world, isOpen, onOpenChange }: ShareWorldDial
           });
         }
       } catch (error) {
-        console.error('Failed to load existing share info:', error);
+        if (import.meta.env.PROD) {
+          Sentry.captureException(error, {
+            tags: {
+              operation: 'load_share_info',
+              worldId: worldId
+            }
+          });
+        } else {
+          console.error('Failed to load existing share info:', error);
+        }
       }
     };
 
@@ -141,7 +151,15 @@ export function ShareWorldDialog({ world, isOpen, onOpenChange }: ShareWorldDial
                   throw new Error(data.message || 'Failed to create share URL');
                 }
               } catch (parseError) {
-                console.error('Error parsing streaming data:', parseError);
+                if (import.meta.env.PROD) {
+                  Sentry.captureException(parseError, {
+                    tags: {
+                      operation: 'parse_share_streaming_data'
+                    }
+                  });
+                } else {
+                  console.error('Error parsing streaming data:', parseError);
+                }
               }
             }
           }
@@ -158,7 +176,16 @@ export function ShareWorldDialog({ world, isOpen, onOpenChange }: ShareWorldDial
       }
 
     } catch (error: any) {
-      console.error('Failed to create share URL:', error);
+      if (import.meta.env.PROD) {
+        Sentry.captureException(error, {
+          tags: {
+            operation: 'create_share_url',
+            worldId: worldId
+          }
+        });
+      } else {
+        console.error('Failed to create share URL:', error);
+      }
       toast.error(error.message || 'Failed to create share URL');
     } finally {
       setIsGenerating(false);

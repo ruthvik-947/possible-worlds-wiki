@@ -1,7 +1,8 @@
 import React, { useState, useCallback } from 'react';
 import { toast } from 'sonner';
+import * as Sentry from '@sentry/react';
 import { WikiPageData, generateWikiPage } from '../components/WikiGenerator';
-import { World, updateWorldMetadata } from '../components/WorldModel';
+import { World, updateWorldMetadata, createNewWorld } from '../components/WorldModel';
 import { updateWorldbuildingHistory } from '../components/WorldbuildingHistory';
 
 export interface UsePageGenerationReturn {
@@ -116,7 +117,17 @@ export function usePageGeneration(
       // Directly trigger auto-save after page generation completes
       setTimeout(() => performAutoSave(), 100);
     } catch (error: any) {
-      console.error('Error generating page:', error);
+      if (import.meta.env.PROD) {
+        Sentry.captureException(error, {
+          tags: {
+            operation: 'generate_page',
+            term: term,
+            worldSize: pages.size
+          }
+        });
+      } else {
+        console.error('Error generating page:', error);
+      }
       if (error instanceof Error && error.message.includes('authentication token')) {
         setErrorMessage(error.message);
       } else if (error.code === 'RATE_LIMIT_EXCEEDED') {
@@ -143,8 +154,6 @@ export function usePageGeneration(
   }, [pages, currentWorld, navigateToPage, requireAuthToken, showApiKeyRequiredToast, enableUserApiKeys, setPages, setCurrentWorld, setCurrentUsageInfo, performAutoSave]);
 
   const generateFirstPageWithSeed = useCallback(async (seed: string) => {
-    const { createNewWorld } = require('../components/WorldModel');
-
     // Always start fresh - clear existing world state
     const newWorld = createNewWorld();
     setCurrentWorld(newWorld);
@@ -215,7 +224,16 @@ export function usePageGeneration(
       // Directly trigger auto-save after seed page generation completes
       setTimeout(() => performAutoSave(), 100);
     } catch (error: any) {
-      console.error('Error generating first page:', error);
+      if (import.meta.env.PROD) {
+        Sentry.captureException(error, {
+          tags: {
+            operation: 'generate_first_page',
+            seed: seed.substring(0, 50)
+          }
+        });
+      } else {
+        console.error('Error generating first page:', error);
+      }
       if (error instanceof Error && error.message.includes('authentication token')) {
         setErrorMessage(error.message);
       } else if (error.code === 'RATE_LIMIT_EXCEEDED') {
