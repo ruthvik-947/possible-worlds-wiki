@@ -129,6 +129,11 @@ export function WikiInterface({
   };
 
   const handleHome = () => {
+    // If user is not signed in and in read-only mode, show auth prompt
+    if (!isSignedIn && readOnlyMode) {
+      handleAuthPrompt('access home');
+      return;
+    }
     worldManagement.handleNewWorld();
     setSeedSentence('');
   };
