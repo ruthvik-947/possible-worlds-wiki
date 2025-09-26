@@ -112,7 +112,7 @@ export function WikiInterface({
     if (apiKeyManagement.enableUserApiKeys) {
       apiKeyManagement.setIsApiDialogOpen(true);
     } else {
-      toast.info('Sign up or sign in first to set your API key.', {
+      toast.info('Sign up or sign in to set your API key.', {
         duration: 8000
       });
     }
@@ -129,11 +129,6 @@ export function WikiInterface({
   };
 
   const handleHome = () => {
-    // If user is not signed in and in read-only mode, show auth prompt
-    if (!isSignedIn && readOnlyMode) {
-      handleAuthPrompt('access home');
-      return;
-    }
     worldManagement.handleNewWorld();
     setSeedSentence('');
   };
