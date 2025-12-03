@@ -40,9 +40,6 @@ npm run dev        # Frontend on localhost:5173
 | `npm run dev:api` | Start Express backend |
 | `npm run dev:vercel` | Start Vercel dev server |
 | `npm run build` | Build for production |
-| `npm run lint` | Run ESLint |
-| `npm run typecheck` | Run TypeScript checks |
-| `npm run test:api-parity` | Test API consistency |
 
 ## License
 
