@@ -33,3 +33,15 @@ package-lock.json
 # tasks.json
 # tasks/ 
 .vercel
+
+# Build output
+dist/
+
+# TypeScript cache
+*.tsbuildinfo
+
+# Sentry
+.sentryclirc
+
+# Test coverage
+coverage/
